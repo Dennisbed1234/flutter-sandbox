@@ -1,7 +1,7 @@
 {
   "name": "code-sandbox",
   "private": true,
-  "version": "2.1.0",
+  "version": "3.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -25,5 +25,8 @@
     "tailwindcss": "3.4.10",
     "typescript": "5.5.4",
     "vite": "5.4.2"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
