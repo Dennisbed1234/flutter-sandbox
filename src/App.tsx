@@ -135,6 +135,7 @@ export default function App() {
   const [status, setStatus] = useState('Ready')
   const [issues, setIssues] = useState<AnalysisIssue[]>([])
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const analyzeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -155,17 +156,16 @@ export default function App() {
       const list: AnalysisIssue[] = data.issues || []
       setIssues(list)
 
-      // Set Monaco markers
       if (editorRef.current) {
         const model = editorRef.current.getModel()
         if (model) {
           const markers = list.map((issue) => ({
             severity:
               issue.kind === 'error'
-                ? 8 // MarkerSeverity.Error
+                ? 8
                 : issue.kind === 'warning'
-                ? 4 // Warning
-                : 2, // Info
+                ? 4
+                : 2,
             message: issue.message,
             startLineNumber: issue.location?.startLine || 1,
             startColumn: issue.location?.startColumn || 1,
@@ -213,19 +213,10 @@ export default function App() {
   }, [code])
 
   const runInDartPad = useCallback(() => {
-    // Create a temporary gist-like share via DartPad's null-safety / embed approach
-    // Best reliable way: open official DartPad with the code injected via a data URL approach
-    // or simply open dartpad.dev and let user paste (but we can do better).
-
-    // Official recommended: open embed-flutter with a gist, but for arbitrary code we open
-    // a new window to dartpad.dev and instruct, or use the new compile path.
-    // Practical solution used by many tools: open https://dartpad.dev with query or postMessage.
-
     const win = window.open('https://dartpad.dev/?null_safety=true', '_blank')
     if (win) {
-      // User can paste, but we also offer copy
       navigator.clipboard.writeText(code).then(() => {
-        setStatus('Code copied! Paste into the new DartPad tab (Ctrl/Cmd+V) then click Run')
+        setStatus('Code copied! Paste into the new DartPad tab then click Run')
       }).catch(() => {
         setStatus('Opened DartPad – paste your code and Run')
       })
@@ -233,10 +224,6 @@ export default function App() {
       setStatus('Popup blocked – allow popups or copy code manually')
     }
   }, [code])
-
-  // Better Run: use a dedicated preview that embeds DartPad with the current code via a clever trick.
-  // Since direct code injection is limited, we provide a full-screen iframe option + copy.
-  const [showPreview, setShowPreview] = useState(false)
 
   useEffect(() => {
     if (analyzeTimeout.current) clearTimeout(analyzeTimeout.current)
@@ -246,23 +233,80 @@ export default function App() {
     }
   }, [code, analyze])
 
+  // Responsive font size for Monaco
+  const getEditorFontSize = () => {
+    if (typeof window === 'undefined') return 14
+    const w = window.innerWidth
+    if (w < 640) return 12      // iPhone
+    if (w < 1024) return 13     // iPad
+    return 14                   // Laptop+
+  }
+
   return (
-    <div className="h-screen flex flex-col bg-gray-950 text-gray-100">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-900">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center font-bold text-white text-sm">
-            F
+    <div className="h-[100dvh] flex flex-col bg-gray-950 text-gray-100 safe-top safe-bottom safe-left safe-right">
+      {/* ========== HEADER ========== */}
+      <header className="shrink-0 border-b border-gray-800 bg-gray-900">
+        {/* Top row: Logo + Title */}
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center font-bold text-white text-xs sm:text-sm shrink-0">
+              F
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg font-semibold leading-tight truncate">Flutter Sandbox</h1>
+              <p className="text-[10px] sm:text-xs text-gray-400 hidden xs:block sm:block">Online Flutter Playground</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-semibold leading-tight">Flutter Sandbox</h1>
-            <p className="text-xs text-gray-400">Online Flutter Playground</p>
+
+          {/* Desktop / iPad controls (hidden on pure mobile) */}
+          <div className="hidden md:flex items-center gap-2">
+            <select
+              className="bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm max-w-[140px]"
+              onChange={(e) => {
+                const sample = SAMPLES[e.target.value]
+                if (sample) setCode(sample)
+              }}
+              defaultValue="Counter App"
+            >
+              {Object.keys(SAMPLES).map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+
+            <button
+              onClick={formatCode}
+              className="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-sm border border-gray-700"
+            >
+              Format
+            </button>
+
+            <button
+              onClick={() => setTheme((t) => (t === 'vs-dark' ? 'light' : 'vs-dark'))}
+              className="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-sm border border-gray-700"
+            >
+              {theme === 'vs-dark' ? '☀️' : '🌙'}
+            </button>
+
+            <button
+              onClick={runInDartPad}
+              className="px-4 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-sm font-medium"
+            >
+              ▶ Run
+            </button>
+
+            <button
+              onClick={() => setShowPreview(!showPreview)}
+              className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-sm font-medium"
+            >
+              {showPreview ? 'Hide' : 'Preview'}
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Mobile controls row (visible only on < md) */}
+        <div className="md:hidden flex items-center gap-1.5 px-3 pb-2 overflow-x-auto overflow-touch">
           <select
-            className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm"
+            className="bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs shrink-0"
             onChange={(e) => {
               const sample = SAMPLES[e.target.value]
               if (sample) setCode(sample)
@@ -270,47 +314,61 @@ export default function App() {
             defaultValue="Counter App"
           >
             {Object.keys(SAMPLES).map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
+              <option key={name} value={name}>{name}</option>
             ))}
           </select>
 
           <button
             onClick={formatCode}
-            className="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-sm border border-gray-700"
+            className="px-2.5 py-1.5 rounded bg-gray-800 active:bg-gray-700 text-xs border border-gray-700 shrink-0"
           >
             Format
           </button>
 
           <button
             onClick={() => setTheme((t) => (t === 'vs-dark' ? 'light' : 'vs-dark'))}
-            className="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-sm border border-gray-700"
+            className="px-2.5 py-1.5 rounded bg-gray-800 active:bg-gray-700 text-xs border border-gray-700 shrink-0"
           >
-            {theme === 'vs-dark' ? '☀️ Light' : '🌙 Dark'}
+            {theme === 'vs-dark' ? '☀️' : '🌙'}
           </button>
 
           <button
             onClick={runInDartPad}
-            className="px-4 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-sm font-medium"
+            className="px-3 py-1.5 rounded bg-blue-600 active:bg-blue-500 text-xs font-medium shrink-0"
           >
-            ▶ Run in DartPad
+            ▶ Run
           </button>
 
           <button
             onClick={() => setShowPreview(!showPreview)}
-            className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-sm font-medium"
+            className="px-2.5 py-1.5 rounded bg-emerald-600 active:bg-emerald-500 text-xs font-medium shrink-0"
           >
-            {showPreview ? 'Hide Preview' : 'Live Preview'}
+            {showPreview ? 'Hide' : 'Preview'}
           </button>
         </div>
       </header>
 
-      {/* Main */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Editor */}
-        <div className={`${showPreview ? 'w-1/2' : 'w-full'} flex flex-col border-r border-gray-800`}>
-          <div className="flex-1">
+      {/* ========== MAIN CONTENT ========== */}
+      {/*
+        Mobile / iPad portrait (< lg): stack vertically
+        Laptop / iPad landscape (≥ lg): side-by-side when preview is open
+      */}
+      <div
+        className={`flex-1 flex overflow-hidden ${
+          showPreview
+            ? 'flex-col lg:flex-row'
+            : 'flex-col'
+        }`}
+      >
+        {/* Editor panel */}
+        <div
+          className={`flex flex-col border-gray-800 ${
+            showPreview
+              ? 'h-1/2 lg:h-full lg:w-1/2 border-b lg:border-b-0 lg:border-r'
+              : 'h-full w-full'
+          }`}
+        >
+          <div className="flex-1 min-h-0">
             <Editor
               height="100%"
               defaultLanguage="dart"
@@ -319,64 +377,75 @@ export default function App() {
               onChange={(v) => setCode(v || '')}
               onMount={onMount}
               options={{
-                fontSize: 14,
+                fontSize: getEditorFontSize(),
                 minimap: { enabled: false },
                 scrollBeyondLastLine: false,
                 automaticLayout: true,
                 tabSize: 2,
                 wordWrap: 'on',
+                // Better mobile experience
+                lineNumbers: window.innerWidth < 640 ? 'off' : 'on',
+                glyphMargin: window.innerWidth >= 640,
+                folding: window.innerWidth >= 640,
+                padding: { top: 8, bottom: 8 },
               }}
             />
           </div>
 
           {/* Status bar */}
-          <div className="h-8 px-3 flex items-center justify-between text-xs bg-gray-900 border-t border-gray-800 text-gray-400">
-            <span>{isAnalyzing ? 'Analyzing…' : status}</span>
-            <span>{issues.length} issue(s)</span>
+          <div className="h-7 sm:h-8 px-2 sm:px-3 flex items-center justify-between text-[10px] sm:text-xs bg-gray-900 border-t border-gray-800 text-gray-400 shrink-0">
+            <span className="truncate">{isAnalyzing ? 'Analyzing…' : status}</span>
+            <span className="shrink-0 ml-2">{issues.length} issue(s)</span>
           </div>
         </div>
 
         {/* Preview panel */}
         {showPreview && (
-          <div className="w-1/2 flex flex-col bg-gray-900">
-            <div className="px-3 py-2 text-sm border-b border-gray-800 flex justify-between items-center">
-              <span>Live Flutter Preview (powered by DartPad)</span>
+          <div
+            className={`flex flex-col bg-gray-900 ${
+              showPreview
+                ? 'h-1/2 lg:h-full lg:w-1/2'
+                : ''
+            }`}
+          >
+            <div className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border-b border-gray-800 flex justify-between items-center shrink-0">
+              <span className="truncate">Live Preview</span>
               <a
                 href="https://dartpad.dev"
                 target="_blank"
                 rel="noreferrer"
-                className="text-blue-400 hover:underline text-xs"
+                className="text-blue-400 hover:underline text-[10px] sm:text-xs shrink-0 ml-2"
               >
-                Open full DartPad ↗
+                Full DartPad ↗
               </a>
             </div>
             <iframe
               title="DartPad Flutter"
               src="https://dartpad.dev/embed-flutter.html?theme=dark&run=true&split=60"
-              className="flex-1 w-full border-0"
+              className="flex-1 w-full border-0 min-h-0"
               allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; midi"
             />
-            <div className="p-2 text-xs text-gray-500 border-t border-gray-800">
-              Tip: Click <strong>Run in DartPad</strong> to copy your current code, then paste it into the preview or the new tab.
+            <div className="p-1.5 sm:p-2 text-[10px] sm:text-xs text-gray-500 border-t border-gray-800 shrink-0">
+              Tip: Tap <strong>Run</strong> to copy code, then paste into the preview.
             </div>
           </div>
         )}
       </div>
 
-      {/* Issues panel (bottom) */}
+      {/* ========== ISSUES PANEL ========== */}
       {issues.length > 0 && (
-        <div className="max-h-32 overflow-y-auto border-t border-gray-800 bg-gray-900 text-xs">
+        <div className="max-h-24 sm:max-h-32 overflow-y-auto overflow-touch border-t border-gray-800 bg-gray-900 text-[10px] sm:text-xs shrink-0">
           {issues.map((issue, i) => (
             <div
               key={i}
-              className={`px-3 py-1 border-b border-gray-800 flex gap-2 ${
+              className={`px-2 sm:px-3 py-1 border-b border-gray-800 flex gap-2 ${
                 issue.kind === 'error' ? 'text-red-400' : 'text-yellow-400'
               }`}
             >
-              <span className="font-mono w-16 shrink-0">
+              <span className="font-mono w-12 sm:w-16 shrink-0">
                 L{issue.location?.startLine || '?'}
               </span>
-              <span>{issue.message}</span>
+              <span className="break-words">{issue.message}</span>
             </div>
           ))}
         </div>
