@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import Editor, { OnMount } from '@monaco-editor/react'
-import type { editor } from 'monaco-editor'
+import Editor from '@monaco-editor/react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
@@ -23,23 +22,23 @@ declare global {
 }
 
 export default function App() {
-  const [code, setCode] = useState(SAMPLES.Python.code)
-  const [language, setLanguage] = useState<Lang>('python')
+  const [code, setCode] = useState(SAMPLES['iPhone Home'].code)
+  const [language, setLanguage] = useState<Lang>('html')
   const [theme, setTheme] = useState<'vs-dark' | 'light'>('vs-dark')
   const [status, setStatus] = useState('Ready')
   const [isRunning, setIsRunning] = useState(false)
-  const [showTerminal, setShowTerminal] = useState(true)
-  const [showPreview, setShowPreview] = useState(false)
   const [previewHtml, setPreviewHtml] = useState('')
   const [pyodideReady, setPyodideReady] = useState(false)
   const [activeTab, setActiveTab] = useState<'editor' | 'terminal' | 'preview'>('editor')
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : true
+  )
 
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const termRef = useRef<Terminal | null>(null)
   const termContainerRef = useRef<HTMLDivElement>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const pyodideRef = useRef<PyodideInterface | null>(null)
+  const termInited = useRef(false)
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -48,13 +47,19 @@ export default function App() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
+  // Init terminal when container is visible
   useEffect(() => {
-    if (!termContainerRef.current || termRef.current) return
+    const el = termContainerRef.current
+    if (!el) return
+    if (termRef.current) {
+      fitAddonRef.current?.fit()
+      return
+    }
 
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 13,
-      fontFamily: 'Menlo, Monaco, "SF Mono", "Courier New", monospace',
+      fontFamily: 'Menlo, Monaco, monospace',
       theme: {
         background: '#0a0f1a',
         foreground: '#e2e8f0',
@@ -63,35 +68,24 @@ export default function App() {
       },
       convertEol: true,
     })
-
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
     term.loadAddon(new WebLinksAddon())
-    term.open(termContainerRef.current)
+    term.open(el)
     fitAddon.fit()
-
-    term.writeln('  Code Sandbox v2')
-    term.writeln('  Python · JS · TS · HTML')
-    term.writeln('  Tap Run or press Ctrl+Enter')
+    term.writeln('Code Sandbox ready')
+    term.writeln('Python · JS · HTML preview')
     term.writeln('')
-
     termRef.current = term
     fitAddonRef.current = fitAddon
+    termInited.current = true
 
     const onResize = () => fitAddon.fit()
     window.addEventListener('resize', onResize)
     return () => {
       window.removeEventListener('resize', onResize)
-      term.dispose()
-      termRef.current = null
     }
-  }, [])
-
-  useEffect(() => {
-    if ((showTerminal || activeTab === 'terminal') && fitAddonRef.current) {
-      setTimeout(() => fitAddonRef.current?.fit(), 80)
-    }
-  }, [showTerminal, showPreview, activeTab])
+  }, [activeTab, isMobile])
 
   useEffect(() => {
     let cancelled = false
@@ -109,7 +103,7 @@ export default function App() {
             s.id = 'pyodide-script'
             s.src = 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js'
             s.onload = () => resolve()
-            s.onerror = () => reject(new Error('Pyodide load failed'))
+            s.onerror = () => reject(new Error('fail'))
             document.head.appendChild(s)
           })
         }
@@ -121,30 +115,42 @@ export default function App() {
         pyodideRef.current = py
         setPyodideReady(true)
         setStatus('Ready')
-        termRef.current?.writeln('  Python ready')
       } catch {
-        setStatus('Python failed')
-        termRef.current?.writeln('  Python failed to load')
+        setStatus('Python offline')
       }
     }
     load()
     return () => { cancelled = true }
   }, [])
 
-  const clearTerm = useCallback(() => termRef.current?.clear(), [])
+  const clearTerminal = useCallback(() => {
+    termRef.current?.clear()
+    termRef.current?.writeln('Terminal cleared')
+    setStatus('Terminal cleared')
+  }, [])
+
+  const clearCode = useCallback(() => {
+    setCode('')
+    setStatus('Code cleared')
+  }, [])
 
   const runCode = useCallback(async () => {
     if (isRunning) return
     setIsRunning(true)
     setStatus('Running…')
-    if (isMobile) setActiveTab('terminal')
 
     const term = termRef.current
 
     try {
-      if (language === 'python') {
+      if (language === 'html') {
+        setPreviewHtml(code)
+        setActiveTab('preview')
+        term?.writeln('HTML preview updated')
+        setStatus('Preview ready')
+      } else if (language === 'python') {
+        setActiveTab('terminal')
         if (!pyodideRef.current) {
-          term?.writeln('Python not ready yet…')
+          term?.writeln('Python still loading…')
           setStatus('Wait for Python')
           return
         }
@@ -157,26 +163,16 @@ export default function App() {
           term?.writeln('-- done --')
           setStatus('Done')
         } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err)
-          term?.writeln(msg)
+          term?.writeln(err instanceof Error ? err.message : String(err))
           setStatus('Error')
         }
-      } else if (language === 'javascript' || language === 'typescript') {
-        term?.writeln('-- ' + (language === 'typescript' ? 'TypeScript' : 'JavaScript') + ' --')
+      } else {
+        setActiveTab('terminal')
+        term?.writeln('-- JavaScript --')
         const origLog = console.log
-        const origError = console.error
-        const origWarn = console.warn
         console.log = (...a: unknown[]) => {
           term?.writeln(a.map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(' '))
           origLog(...a)
-        }
-        console.error = (...a: unknown[]) => {
-          term?.writeln(a.map(String).join(' '))
-          origError(...a)
-        }
-        console.warn = (...a: unknown[]) => {
-          term?.writeln(a.map(String).join(' '))
-          origWarn(...a)
         }
         try {
           // eslint-disable-next-line no-new-func
@@ -184,26 +180,16 @@ export default function App() {
           term?.writeln('-- done --')
           setStatus('Done')
         } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err)
-          term?.writeln(msg)
+          term?.writeln(err instanceof Error ? err.message : String(err))
           setStatus('Error')
         } finally {
           console.log = origLog
-          console.error = origError
-          console.warn = origWarn
         }
-      } else if (language === 'html') {
-        term?.writeln('-- HTML Preview --')
-        setPreviewHtml(code)
-        setShowPreview(true)
-        if (isMobile) setActiveTab('preview')
-        term?.writeln('Preview updated')
-        setStatus('Preview ready')
       }
     } finally {
       setIsRunning(false)
     }
-  }, [code, language, isRunning, isMobile])
+  }, [code, language, isRunning])
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -216,69 +202,100 @@ export default function App() {
     return () => window.removeEventListener('keydown', h)
   }, [runCode])
 
-  const onMount: OnMount = (ed) => { editorRef.current = ed }
-
   const changeSample = (name: string) => {
     const s = SAMPLES[name]
     if (s) {
       setCode(s.code)
       setLanguage(s.language as Lang)
+      setStatus('Sample loaded')
     }
   }
 
   const fontSize = isMobile ? 13 : 14
 
+  // Shared bottom bar for mobile
+  const MobileBar = () => (
+    <div className="shrink-0 px-2 py-2 flex items-center gap-1.5 border-t border-slate-800 bg-[#0c1220] safe-bottom">
+      <button
+        onClick={clearCode}
+        className="h-10 px-3 rounded-xl bg-slate-800 text-xs text-slate-300 active:bg-slate-700"
+      >
+        Erase
+      </button>
+      <button
+        onClick={clearTerminal}
+        className="h-10 px-3 rounded-xl bg-slate-800 text-xs text-slate-300 active:bg-slate-700"
+      >
+        Clear Term
+      </button>
+      <div className="flex-1 text-center">
+        <p className="text-[10px] text-slate-500 truncate">{status}</p>
+      </div>
+      <button
+        onClick={runCode}
+        disabled={isRunning}
+        className="h-10 px-5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm disabled:opacity-40 shadow-lg shadow-emerald-500/20"
+      >
+        {isRunning ? '…' : 'Run'}
+      </button>
+    </div>
+  )
+
   if (isMobile) {
     return (
-      <div className="h-[100dvh] flex flex-col bg-[#070b14] text-slate-100 safe-top safe-bottom">
-        <header className="shrink-0 px-3 pt-2 pb-1.5 flex items-center justify-between border-b border-slate-800/80 bg-[#0c1220]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+      <div className="h-[100dvh] flex flex-col bg-[#070b14] text-slate-100 safe-top">
+        <header className="shrink-0 px-3 pt-2 pb-1.5 flex items-center justify-between border-b border-slate-800 bg-[#0c1220]">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center">
               <span className="text-white font-bold text-sm">CS</span>
             </div>
             <div>
-              <h1 className="text-[15px] font-semibold tracking-tight">Code Sandbox</h1>
-              <p className="text-[10px] text-slate-500 leading-none">
-                {language === 'python' ? (pyodideReady ? 'Python ready' : 'Loading Python…') : language}
+              <h1 className="text-[15px] font-semibold">Code Sandbox</h1>
+              <p className="text-[10px] text-slate-500">
+                {language === 'python'
+                  ? pyodideReady ? 'Python ready' : 'Loading Python…'
+                  : language}
               </p>
             </div>
           </div>
           <button
             onClick={() => setTheme(t => t === 'vs-dark' ? 'light' : 'vs-dark')}
-            className="w-9 h-9 rounded-xl bg-slate-800/80 flex items-center justify-center text-base"
+            className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center"
           >
             {theme === 'vs-dark' ? '☀️' : '🌙'}
           </button>
         </header>
 
-        <div className="shrink-0 px-3 py-2 flex gap-2 overflow-x-auto border-b border-slate-800/60">
+        <div className="shrink-0 px-3 py-2 flex gap-2 overflow-x-auto border-b border-slate-800">
           <select
-            className="bg-slate-800/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs min-w-[110px]"
+            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs min-w-[120px]"
             onChange={(e) => changeSample(e.target.value)}
-            defaultValue="Python"
+            defaultValue="iPhone Home"
           >
-            {Object.keys(SAMPLES).map(n => <option key={n} value={n}>{n}</option>)}
+            {Object.keys(SAMPLES).map(n => (
+              <option key={n} value={n}>{n}</option>
+            ))}
           </select>
           <select
-            className="bg-slate-800/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs"
+            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs"
             value={language}
             onChange={(e) => setLanguage(e.target.value as Lang)}
           >
-            <option value="python">Python</option>
-            <option value="javascript">JavaScript</option>
-            <option value="typescript">TypeScript</option>
             <option value="html">HTML</option>
+            <option value="javascript">JavaScript</option>
+            <option value="python">Python</option>
+            <option value="typescript">TypeScript</option>
           </select>
         </div>
 
-        <div className="shrink-0 flex border-b border-slate-800/60 bg-[#0a101c]">
+        <div className="shrink-0 flex border-b border-slate-800 bg-[#0a101c]">
           {(['editor', 'terminal', 'preview'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2.5 text-xs font-medium capitalize ${
+              className={`flex-1 py-2.5 text-xs font-medium ${
                 activeTab === tab
-                  ? 'text-emerald-400 border-b-2 border-emerald-400 bg-emerald-500/5'
+                  ? 'text-emerald-400 border-b-2 border-emerald-400'
                   : 'text-slate-500'
               }`}
             >
@@ -288,14 +305,13 @@ export default function App() {
         </div>
 
         <div className="flex-1 min-h-0 relative">
-          <div className={`absolute inset-0 ${activeTab === 'editor' ? 'z-10' : 'z-0 invisible'}`}>
+          <div className={`absolute inset-0 ${activeTab === 'editor' ? 'z-10' : 'invisible'}`}>
             <Editor
               height="100%"
               language={language === 'python' ? 'python' : language}
               theme={theme}
               value={code}
               onChange={(v) => setCode(v || '')}
-              onMount={onMount}
               options={{
                 fontSize,
                 minimap: { enabled: false },
@@ -306,121 +322,87 @@ export default function App() {
                 lineNumbers: 'on',
                 lineNumbersMinChars: 3,
                 folding: false,
-                padding: { top: 12, bottom: 12 },
+                padding: { top: 8, bottom: 8 },
               }}
             />
           </div>
 
-          <div className={`absolute inset-0 flex flex-col bg-[#0a0f1a] ${activeTab === 'terminal' ? 'z-10' : 'z-0 invisible'}`}>
+          <div className={`absolute inset-0 flex flex-col bg-[#0a0f1a] ${activeTab === 'terminal' ? 'z-10' : 'invisible'}`}>
             <div ref={termContainerRef} className="flex-1 min-h-0 p-1" />
           </div>
 
-          <div className={`absolute inset-0 flex flex-col bg-white ${activeTab === 'preview' ? 'z-10' : 'z-0 invisible'}`}>
+          <div className={`absolute inset-0 flex flex-col bg-black ${activeTab === 'preview' ? 'z-10' : 'invisible'}`}>
             <iframe
               title="Preview"
-              srcDoc={previewHtml || '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:system-ui;color:#94a3b8;background:#f8fafc"><p>Run HTML to see preview</p></body></html>'}
+              srcDoc={previewHtml || '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:system-ui;color:#94a3b8;background:#0a0f1a"><p style="text-align:center;padding:20px">Tap <b>Run</b> on HTML code to see live preview here.<br/><br/>Try the <b>iPhone Home</b> sample!</p></body></html>'}
               className="flex-1 w-full border-0"
               sandbox="allow-scripts"
             />
           </div>
         </div>
 
-        <div className="shrink-0 px-3 py-2.5 flex items-center gap-2 border-t border-slate-800/80 bg-[#0c1220] safe-bottom">
-          <button
-            onClick={clearTerm}
-            className="w-11 h-11 rounded-2xl bg-slate-800/90 flex items-center justify-center text-slate-400 text-xs"
-          >
-            Clear
-          </button>
-          <div className="flex-1 text-center">
-            <p className="text-[11px] text-slate-500 truncate">{status}</p>
-          </div>
-          <button
-            onClick={runCode}
-            disabled={isRunning || (language === 'python' && !pyodideReady)}
-            className="h-11 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm shadow-lg shadow-emerald-500/25 disabled:opacity-40"
-          >
-            {isRunning ? 'Running…' : 'Run'}
-          </button>
-        </div>
+        <MobileBar />
       </div>
     )
   }
 
+  // Desktop
   return (
     <div className="h-[100dvh] flex flex-col bg-[#070b14] text-slate-100">
-      <header className="shrink-0 border-b border-slate-800/80 bg-[#0c1220]">
+      <header className="shrink-0 border-b border-slate-800 bg-[#0c1220]">
         <div className="flex items-center justify-between px-4 py-2.5">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center">
               <span className="text-white font-bold text-sm">CS</span>
             </div>
             <div>
-              <h1 className="text-base font-semibold tracking-tight">Code Sandbox</h1>
-              <p className="text-[11px] text-slate-500">Terminal · Python · JS · Preview</p>
+              <h1 className="text-base font-semibold">Code Sandbox</h1>
+              <p className="text-[11px] text-slate-500">Build apps · Terminal · Live Preview</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <select
-              className="bg-slate-800/90 border border-slate-700/70 rounded-xl px-3 py-2 text-sm"
+              className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm"
               onChange={(e) => changeSample(e.target.value)}
-              defaultValue="Python"
+              defaultValue="iPhone Home"
             >
-              {Object.keys(SAMPLES).map(n => <option key={n} value={n}>{n}</option>)}
+              {Object.keys(SAMPLES).map(n => (
+                <option key={n} value={n}>{n}</option>
+              ))}
             </select>
-
             <select
-              className="bg-slate-800/90 border border-slate-700/70 rounded-xl px-3 py-2 text-sm"
+              className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm"
               value={language}
               onChange={(e) => setLanguage(e.target.value as Lang)}
             >
-              <option value="python">Python</option>
-              <option value="javascript">JavaScript</option>
-              <option value="typescript">TypeScript</option>
               <option value="html">HTML</option>
+              <option value="javascript">JavaScript</option>
+              <option value="python">Python</option>
+              <option value="typescript">TypeScript</option>
             </select>
-
+            <button
+              onClick={clearCode}
+              className="px-3 py-2 rounded-xl text-sm bg-slate-800 border border-slate-700 text-slate-300"
+            >
+              Erase Code
+            </button>
+            <button
+              onClick={clearTerminal}
+              className="px-3 py-2 rounded-xl text-sm bg-slate-800 border border-slate-700 text-slate-300"
+            >
+              Clear Term
+            </button>
             <button
               onClick={() => setTheme(t => t === 'vs-dark' ? 'light' : 'vs-dark')}
-              className="w-9 h-9 rounded-xl bg-slate-800/90 border border-slate-700/70 flex items-center justify-center"
+              className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center"
             >
               {theme === 'vs-dark' ? '☀️' : '🌙'}
             </button>
-
-            <button
-              onClick={() => setShowTerminal(s => !s)}
-              className={`px-3 py-2 rounded-xl text-sm border ${
-                showTerminal
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
-                  : 'bg-slate-800/90 border-slate-700/70 text-slate-300'
-              }`}
-            >
-              Terminal
-            </button>
-
-            <button
-              onClick={() => setShowPreview(s => !s)}
-              className={`px-3 py-2 rounded-xl text-sm border ${
-                showPreview
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
-                  : 'bg-slate-800/90 border-slate-700/70 text-slate-300'
-              }`}
-            >
-              Preview
-            </button>
-
-            <button
-              onClick={clearTerm}
-              className="px-3 py-2 rounded-xl text-sm bg-slate-800/90 border border-slate-700/70 text-slate-300"
-            >
-              Clear
-            </button>
-
             <button
               onClick={runCode}
-              disabled={isRunning || (language === 'python' && !pyodideReady)}
-              className="ml-1 px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white text-sm font-semibold shadow-lg shadow-emerald-500/20 disabled:opacity-40"
+              disabled={isRunning}
+              className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white text-sm font-semibold disabled:opacity-40"
             >
               {isRunning ? 'Running…' : 'Run'}
             </button>
@@ -429,9 +411,7 @@ export default function App() {
       </header>
 
       <div className="flex-1 flex overflow-hidden min-h-0">
-        <div className={`flex flex-col min-h-0 border-slate-800/80 ${
-          showTerminal || showPreview ? 'w-1/2 border-r' : 'w-full'
-        }`}>
+        <div className="w-1/2 flex flex-col border-r border-slate-800 min-h-0">
           <div className="flex-1 min-h-0">
             <Editor
               height="100%"
@@ -439,7 +419,6 @@ export default function App() {
               theme={theme}
               value={code}
               onChange={(v) => setCode(v || '')}
-              onMount={onMount}
               options={{
                 fontSize,
                 minimap: { enabled: false },
@@ -451,46 +430,33 @@ export default function App() {
               }}
             />
           </div>
-          <div className="h-8 px-4 flex items-center justify-between text-xs bg-[#0c1220] border-t border-slate-800/80 text-slate-500">
+          <div className="h-8 px-4 flex items-center justify-between text-xs bg-[#0c1220] border-t border-slate-800 text-slate-500">
             <span>{status}</span>
-            <span>
-              {language === 'python' ? (pyodideReady ? 'Python' : 'Loading…') : language}
-            </span>
+            <span>{language}</span>
           </div>
         </div>
 
-        {(showTerminal || showPreview) && (
-          <div className="w-1/2 flex flex-col min-h-0">
-            {showTerminal && (
-              <div className={`flex flex-col min-h-0 bg-[#0a0f1a] ${
-                showPreview ? 'h-1/2 border-b border-slate-800/80' : 'h-full'
-              }`}>
-                <div className="px-3 py-1.5 text-xs border-b border-slate-800/80 flex justify-between items-center bg-[#0c1220] text-slate-400">
-                  <span className="font-medium text-slate-300">Terminal</span>
-                  <span className="text-[10px]">Ctrl + Enter</span>
-                </div>
-                <div ref={termContainerRef} className="flex-1 min-h-0 p-1" />
-              </div>
-            )}
-
-            {showPreview && (
-              <div className={`flex flex-col min-h-0 bg-white ${
-                showTerminal ? 'h-1/2' : 'h-full'
-              }`}>
-                <div className="px-3 py-1.5 text-xs border-b border-slate-200 flex justify-between items-center bg-slate-50 text-slate-600">
-                  <span className="font-medium">Preview</span>
-                  <button onClick={() => setShowPreview(false)} className="text-slate-400 text-sm">X</button>
-                </div>
-                <iframe
-                  title="Preview"
-                  srcDoc={previewHtml || '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:system-ui;color:#94a3b8;background:#f8fafc"><p>Run HTML code to see preview</p></body></html>'}
-                  className="flex-1 w-full border-0"
-                  sandbox="allow-scripts"
-                />
-              </div>
-            )}
+        <div className="w-1/2 flex flex-col min-h-0">
+          <div className="h-1/2 flex flex-col min-h-0 border-b border-slate-800 bg-[#0a0f1a]">
+            <div className="px-3 py-1.5 text-xs border-b border-slate-800 flex justify-between bg-[#0c1220] text-slate-400">
+              <span className="text-slate-300 font-medium">Terminal</span>
+              <button onClick={clearTerminal} className="text-emerald-400 hover:underline">Clear</button>
+            </div>
+            <div ref={termContainerRef} className="flex-1 min-h-0 p-1" />
           </div>
-        )}
+          <div className="h-1/2 flex flex-col min-h-0 bg-black">
+            <div className="px-3 py-1.5 text-xs border-b border-slate-800 flex justify-between bg-[#0c1220] text-slate-400">
+              <span className="text-slate-300 font-medium">Preview</span>
+              <span className="text-[10px]">HTML / interactive apps</span>
+            </div>
+            <iframe
+              title="Preview"
+              srcDoc={previewHtml || '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:system-ui;color:#94a3b8;background:#0a0f1a"><p>Run HTML to preview. Try <b>iPhone Home</b> sample.</p></body></html>'}
+              className="flex-1 w-full border-0"
+              sandbox="allow-scripts"
+            />
+          </div>
+        </div>
       </div>
     </div>
   )
