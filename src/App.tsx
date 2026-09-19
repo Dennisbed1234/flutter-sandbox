@@ -21,6 +21,13 @@ declare global {
   }
 }
 
+// Full iPhone 17 mock — uses local copy if present, else live deployment
+const IPHONE_URLS = [
+  '/iphone/index.html',
+  'https://i-phone17-mock.vercel.app',
+  'https://iphone17-mock.vercel.app',
+]
+
 export default function App() {
   const [code, setCode] = useState(SAMPLES['iPhone Home'].code)
   const [language, setLanguage] = useState<Lang>('html')
@@ -35,6 +42,8 @@ export default function App() {
   )
   const [showPasteBox, setShowPasteBox] = useState(false)
   const [pasteText, setPasteText] = useState('')
+  const [showIPhone, setShowIPhone] = useState(false)
+  const [iphoneSrc, setIphoneSrc] = useState(IPHONE_URLS[0])
 
   const termRef = useRef<Terminal | null>(null)
   const termContainerRef = useRef<HTMLDivElement>(null)
@@ -50,13 +59,27 @@ export default function App() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  // Init terminal when container exists
+  // Prefer local /iphone if available
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await fetch('/iphone/index.html', { method: 'HEAD' })
+        if (!cancelled && r.ok) {
+          setIphoneSrc('/iphone/index.html')
+          return
+        }
+      } catch { /* ignore */ }
+      if (!cancelled) setIphoneSrc(IPHONE_URLS[1])
+    })()
+    return () => { cancelled = true }
+  }, [])
+
   useEffect(() => {
     const el = termContainerRef.current
     if (!el) return
 
     if (termRef.current) {
-      // Already created – reattach if needed and fit
       try {
         if (!(termRef.current as any).element?.isConnected) {
           termRef.current.open(el)
@@ -85,7 +108,7 @@ export default function App() {
     term.open(el)
     fitAddon.fit()
     term.writeln('Code Sandbox ready')
-    term.writeln('Python · JS · HTML preview')
+    term.writeln('Python · JS · HTML · Full iPhone simulator')
     term.writeln('')
     termRef.current = term
     fitAddonRef.current = fitAddon
@@ -133,7 +156,6 @@ export default function App() {
     return () => { cancelled = true }
   }, [])
 
-  // Fully clear terminal (viewport + scrollback)
   const clearTerminal = useCallback(() => {
     const term = termRef.current
     if (!term) {
@@ -141,7 +163,6 @@ export default function App() {
       setActiveTab('terminal')
       return
     }
-    // Hard reset: clear screen + scrollback + home cursor
     term.reset()
     term.clear()
     term.write('\x1b[2J\x1b[3J\x1b[H')
@@ -154,32 +175,26 @@ export default function App() {
 
   const clearCode = useCallback(() => {
     setCode('')
-    if (editorRef.current) {
-      editorRef.current.setValue('')
-    }
+    if (editorRef.current) editorRef.current.setValue('')
     setStatus('Code erased')
     setActiveTab('editor')
   }, [])
 
-  // Paste into editor – works on iPhone
   const pasteCode = useCallback(async () => {
     setActiveTab('editor')
     try {
-      // Prefer modern clipboard API (works on iOS 13.4+ with user gesture)
       if (navigator.clipboard && navigator.clipboard.readText) {
         const text = await navigator.clipboard.readText()
         if (text && text.length > 0) {
           const ed = editorRef.current
           if (ed) {
             const selection = ed.getSelection()
-            const id = { major: 1, minor: 1 }
-            const op = {
-              identifier: id,
+            ed.executeEdits('paste', [{
+              identifier: { major: 1, minor: 1 },
               range: selection,
               text,
               forceMoveMarkers: true,
-            }
-            ed.executeEdits('paste', [op])
+            }])
             setCode(ed.getValue())
           } else {
             setCode((prev) => (prev ? prev + '\n' + text : text))
@@ -188,10 +203,7 @@ export default function App() {
           return
         }
       }
-    } catch {
-      // Fall through to manual paste box (iOS often blocks silent read)
-    }
-    // Fallback: show paste textarea (always works on iPhone)
+    } catch { /* fall through */ }
     setPasteText('')
     setShowPasteBox(true)
     setTimeout(() => pasteAreaRef.current?.focus(), 100)
@@ -226,9 +238,7 @@ export default function App() {
     if (isRunning) return
     setIsRunning(true)
     setStatus('Running…')
-
     const term = termRef.current
-
     try {
       if (language === 'html') {
         setPreviewHtml(code)
@@ -302,15 +312,47 @@ export default function App() {
 
   const fontSize = isMobile ? 13 : 14
 
+  // Full-screen iPhone simulator
+  if (showIPhone) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+        <div className="shrink-0 flex items-center justify-between px-3 py-2 bg-black/90 border-b border-white/10">
+          <button
+            onClick={() => setShowIPhone(false)}
+            className="h-9 px-4 rounded-full bg-white/10 text-white text-sm font-medium active:bg-white/20"
+          >
+            ← Back to Sandbox
+          </button>
+          <span className="text-xs text-white/60">iPhone 17 · Passcode 000000</span>
+          <button
+            onClick={() => {
+              const el = document.getElementById('iphone-frame') as HTMLIFrameElement | null
+              if (el) el.src = el.src
+            }}
+            className="h-9 px-3 rounded-full bg-white/10 text-white text-xs"
+          >
+            Reboot
+          </button>
+        </div>
+        <iframe
+          id="iphone-frame"
+          title="iPhone 17 Simulator"
+          src={iphoneSrc}
+          className="flex-1 w-full border-0 bg-black"
+          allow="camera; microphone; fullscreen"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+        />
+      </div>
+    )
+  }
+
   const PasteModal = () => {
     if (!showPasteBox) return null
     return (
       <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-3">
         <div className="w-full max-w-lg bg-[#0c1220] border border-slate-700 rounded-2xl p-4 shadow-2xl">
           <h3 className="text-sm font-semibold text-slate-100 mb-2">Paste your code</h3>
-          <p className="text-[11px] text-slate-500 mb-3">
-            Long-press below → Paste, then tap Apply
-          </p>
+          <p className="text-[11px] text-slate-500 mb-3">Long-press below → Paste, then tap Apply</p>
           <textarea
             ref={pasteAreaRef}
             value={pasteText}
@@ -320,44 +362,24 @@ export default function App() {
             autoFocus
           />
           <div className="flex gap-2 mt-3">
-            <button
-              onClick={() => { setShowPasteBox(false); setPasteText('') }}
-              className="flex-1 h-11 rounded-xl bg-slate-800 text-slate-300 text-sm"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={applyPasteBox}
-              className="flex-1 h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm"
-            >
-              Apply Paste
-            </button>
+            <button onClick={() => { setShowPasteBox(false); setPasteText('') }} className="flex-1 h-11 rounded-xl bg-slate-800 text-slate-300 text-sm">Cancel</button>
+            <button onClick={applyPasteBox} className="flex-1 h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm">Apply Paste</button>
           </div>
         </div>
       </div>
     )
   }
 
-  // Shared bottom bar for mobile
   const MobileBar = () => (
     <div className="shrink-0 px-2 py-2 flex items-center gap-1.5 border-t border-slate-800 bg-[#0c1220] safe-bottom">
+      <button onClick={clearCode} className="h-10 px-2 rounded-xl bg-slate-800 text-[11px] text-slate-300">Erase</button>
+      <button onClick={pasteCode} className="h-10 px-2 rounded-xl bg-slate-800 text-[11px] text-slate-300">Paste</button>
+      <button onClick={clearTerminal} className="h-10 px-2 rounded-xl bg-slate-800 text-[11px] text-slate-300">Clear</button>
       <button
-        onClick={clearCode}
-        className="h-10 px-2.5 rounded-xl bg-slate-800 text-[11px] text-slate-300 active:bg-slate-700"
+        onClick={() => setShowIPhone(true)}
+        className="h-10 px-2.5 rounded-xl bg-slate-700 text-[11px] text-emerald-300 font-medium"
       >
-        Erase
-      </button>
-      <button
-        onClick={pasteCode}
-        className="h-10 px-2.5 rounded-xl bg-slate-800 text-[11px] text-slate-300 active:bg-slate-700"
-      >
-        Paste
-      </button>
-      <button
-        onClick={clearTerminal}
-        className="h-10 px-2.5 rounded-xl bg-slate-800 text-[11px] text-slate-300 active:bg-slate-700"
-      >
-        Clear
+        iPhone
       </button>
       <div className="flex-1 text-center min-w-0">
         <p className="text-[10px] text-slate-500 truncate">{status}</p>
@@ -365,7 +387,7 @@ export default function App() {
       <button
         onClick={runCode}
         disabled={isRunning}
-        className="h-10 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm disabled:opacity-40 shadow-lg shadow-emerald-500/20"
+        className="h-10 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm disabled:opacity-40"
       >
         {isRunning ? '…' : 'Run'}
       </button>
@@ -384,18 +406,24 @@ export default function App() {
             <div>
               <h1 className="text-[15px] font-semibold">Code Sandbox</h1>
               <p className="text-[10px] text-slate-500">
-                {language === 'python'
-                  ? pyodideReady ? 'Python ready' : 'Loading Python…'
-                  : language}
+                {language === 'python' ? (pyodideReady ? 'Python ready' : 'Loading Python…') : language}
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setTheme(t => t === 'vs-dark' ? 'light' : 'vs-dark')}
-            className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center"
-          >
-            {theme === 'vs-dark' ? '☀️' : '🌙'}
-          </button>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setShowIPhone(true)}
+              className="h-9 px-3 rounded-xl bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/30"
+            >
+              📱 iPhone
+            </button>
+            <button
+              onClick={() => setTheme(t => t === 'vs-dark' ? 'light' : 'vs-dark')}
+              className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center"
+            >
+              {theme === 'vs-dark' ? '☀️' : '🌙'}
+            </button>
+          </div>
         </header>
 
         <div className="shrink-0 px-3 py-2 flex gap-2 overflow-x-auto border-b border-slate-800">
@@ -427,15 +455,11 @@ export default function App() {
               onClick={() => {
                 setActiveTab(tab)
                 if (tab === 'terminal') {
-                  setTimeout(() => {
-                    try { fitAddonRef.current?.fit() } catch { /* ignore */ }
-                  }, 50)
+                  setTimeout(() => { try { fitAddonRef.current?.fit() } catch { /* */ } }, 50)
                 }
               }}
               className={`flex-1 py-2.5 text-xs font-medium ${
-                activeTab === tab
-                  ? 'text-emerald-400 border-b-2 border-emerald-400'
-                  : 'text-slate-500'
+                activeTab === tab ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-slate-500'
               }`}
             >
               {tab === 'editor' ? 'Code' : tab === 'terminal' ? 'Terminal' : 'Preview'}
@@ -478,7 +502,7 @@ export default function App() {
           <div className={`absolute inset-0 flex flex-col bg-black ${activeTab === 'preview' ? 'z-10' : 'invisible'}`}>
             <iframe
               title="Preview"
-              srcDoc={previewHtml || '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:system-ui;color:#94a3b8;background:#0a0f1a"><p style="text-align:center;padding:20px">Tap <b>Run</b> on HTML code to see live preview here.<br/><br/>Try the <b>iPhone Home</b> sample!</p></body></html>'}
+              srcDoc={previewHtml || '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:system-ui;color:#94a3b8;background:#0a0f1a"><p style="text-align:center;padding:20px">Tap <b>Run</b> for HTML preview.<br/><br/>Or tap <b>📱 iPhone</b> for the full simulator with boot + all apps!</p></body></html>'}
               className="flex-1 w-full border-0"
               sandbox="allow-scripts"
             />
@@ -502,11 +526,17 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-base font-semibold">Code Sandbox</h1>
-              <p className="text-[11px] text-slate-500">Build apps · Terminal · Live Preview</p>
+              <p className="text-[11px] text-slate-500">Build apps · Terminal · Live Preview · iPhone</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              onClick={() => setShowIPhone(true)}
+              className="px-4 py-2 rounded-xl text-sm bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/40"
+            >
+              📱 Full iPhone
+            </button>
             <select
               className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm"
               onChange={(e) => changeSample(e.target.value)}
@@ -526,24 +556,9 @@ export default function App() {
               <option value="python">Python</option>
               <option value="typescript">TypeScript</option>
             </select>
-            <button
-              onClick={pasteCode}
-              className="px-3 py-2 rounded-xl text-sm bg-slate-800 border border-slate-700 text-slate-300"
-            >
-              Paste
-            </button>
-            <button
-              onClick={clearCode}
-              className="px-3 py-2 rounded-xl text-sm bg-slate-800 border border-slate-700 text-slate-300"
-            >
-              Erase Code
-            </button>
-            <button
-              onClick={clearTerminal}
-              className="px-3 py-2 rounded-xl text-sm bg-slate-800 border border-slate-700 text-slate-300"
-            >
-              Clear Term
-            </button>
+            <button onClick={pasteCode} className="px-3 py-2 rounded-xl text-sm bg-slate-800 border border-slate-700 text-slate-300">Paste</button>
+            <button onClick={clearCode} className="px-3 py-2 rounded-xl text-sm bg-slate-800 border border-slate-700 text-slate-300">Erase</button>
+            <button onClick={clearTerminal} className="px-3 py-2 rounded-xl text-sm bg-slate-800 border border-slate-700 text-slate-300">Clear Term</button>
             <button
               onClick={() => setTheme(t => t === 'vs-dark' ? 'light' : 'vs-dark')}
               className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center"
@@ -599,11 +614,11 @@ export default function App() {
           <div className="h-1/2 flex flex-col min-h-0 bg-black">
             <div className="px-3 py-1.5 text-xs border-b border-slate-800 flex justify-between bg-[#0c1220] text-slate-400">
               <span className="text-slate-300 font-medium">Preview</span>
-              <span className="text-[10px]">HTML / interactive apps</span>
+              <button onClick={() => setShowIPhone(true)} className="text-emerald-400 hover:underline">Open Full iPhone →</button>
             </div>
             <iframe
               title="Preview"
-              srcDoc={previewHtml || '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:system-ui;color:#94a3b8;background:#0a0f1a"><p>Run HTML to preview. Try <b>iPhone Home</b> sample.</p></body></html>'}
+              srcDoc={previewHtml || '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:system-ui;color:#94a3b8;background:#0a0f1a"><p>Run HTML to preview, or open <b>Full iPhone</b>.</p></body></html>'}
               className="flex-1 w-full border-0"
               sandbox="allow-scripts"
             />
