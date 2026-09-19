@@ -5,29 +5,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
-
-const SAMPLES: Record<string, { language: string; code: string }> = {
-  Python: {
-    language: 'python',
-    code: `# Python – runs in your browser\nprint("Hello from Python!")\nprint("2 + 2 =", 2 + 2)\n\nnums = [1, 2, 3, 4, 5]\nprint("Squares:", [n**2 for n in nums])\n\ndef greet(name):\n    return f"Hi, {name}!"\n\nprint(greet("Developer"))\n`,
-  },
-  JavaScript: {
-    language: 'javascript',
-    code: `// JavaScript\nconsole.log("Hello from JavaScript!");\nconsole.log("2 + 2 =", 2 + 2);\n\nconst nums = [1, 2, 3, 4, 5];\nconsole.log("Squares:", nums.map(n => n ** 2));\n\nfunction greet(name) {\n  return "Hi, " + name + "!";\n}\nconsole.log(greet("Developer"));\n`,
-  },
-  TypeScript: {
-    language: 'typescript',
-    code: `// TypeScript\nconst message: string = "Hello from TypeScript!";\nconsole.log(message);\n\nfunction add(a: number, b: number): number {\n  return a + b;\n}\nconsole.log("3 + 5 =", add(3, 5));\n`,
-  },
-  HTML: {
-    language: 'html',
-    code: `<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body {\n      font-family: system-ui, sans-serif;\n      display: flex;\n      justify-content: center;\n      align-items: center;\n      height: 100vh;\n      margin: 0;\n      background: linear-gradient(135deg, #0f172a, #1e293b);\n      color: #e2e8f0;\n    }\n    h1 { color: #34d399; font-size: 1.8rem; }\n  </style>\n</head>\n<body>\n  <h1>Hello from HTML</h1>\n</body>\n</html>\n`,
-  },
-  'Python Data': {
-    language: 'python',
-    code: `# Simple data analysis\ndata = [23, 45, 12, 67, 34, 89, 21, 56]\n\nprint("Data:", data)\nprint("Count:", len(data))\nprint("Sum:", sum(data))\nprint("Average:", round(sum(data) / len(data), 2))\nprint("Min:", min(data), "| Max:", max(data))\nprint("Sorted:", sorted(data))\n`,
-  },
-}
+import { SAMPLES } from './samples'
 
 type Lang = 'python' | 'javascript' | 'typescript' | 'html'
 
@@ -350,7 +328,7 @@ export default function App() {
         <div className="shrink-0 px-3 py-2.5 flex items-center gap-2 border-t border-slate-800/80 bg-[#0c1220] safe-bottom">
           <button
             onClick={clearTerm}
-            className="w-11 h-11 rounded-2xl bg-slate-800/90 flex items-center justify-center text-slate-400"
+            className="w-11 h-11 rounded-2xl bg-slate-800/90 flex items-center justify-center text-slate-400 text-xs"
           >
             Clear
           </button>
@@ -360,7 +338,7 @@ export default function App() {
           <button
             onClick={runCode}
             disabled={isRunning || (language === 'python' && !pyodideReady)}
-            className="h-11 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm shadow-lg shadow-emerald-500/25 disabled:opacity-40 flex items-center gap-2"
+            className="h-11 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm shadow-lg shadow-emerald-500/25 disabled:opacity-40"
           >
             {isRunning ? 'Running…' : 'Run'}
           </button>
