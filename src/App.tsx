@@ -6,17 +6,13 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import 'xterm/css/xterm.css'
 
-/* ------------------------------------------------------------------ */
-/*  Language samples                                                   */
-/* ------------------------------------------------------------------ */
 const SAMPLES: Record<string, { language: string; code: string }> = {
   Python: {
     language: 'python',
-    code: `# Python Sandbox – runs in your browser via Pyodide
-print("Hello from Python!")
+    code: `# Python – runs in your browser
+print("Hello from Python! 🐍")
 print("2 + 2 =", 2 + 2)
 
-# Try lists, loops, functions…
 nums = [1, 2, 3, 4, 5]
 print("Squares:", [n**2 for n in nums])
 
@@ -28,8 +24,8 @@ print(greet("Developer"))
   },
   JavaScript: {
     language: 'javascript',
-    code: `// JavaScript runs directly in the browser
-console.log("Hello from JavaScript!");
+    code: `// JavaScript
+console.log("Hello from JavaScript! ⚡");
 console.log("2 + 2 =", 2 + 2);
 
 const nums = [1, 2, 3, 4, 5];
@@ -43,8 +39,8 @@ console.log(greet("Developer"));
   },
   TypeScript: {
     language: 'typescript',
-    code: `// TypeScript (compiled on the fly for demo)
-const message: string = "Hello from TypeScript!";
+    code: `// TypeScript
+const message: string = "Hello from TypeScript! 💙";
 console.log(message);
 
 function add(a: number, b: number): number {
@@ -59,44 +55,46 @@ console.log("3 + 5 =", add(3, 5));
 <html>
 <head>
   <style>
-    body { font-family: system-ui; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #0f172a; color: #e2e8f0; }
-    h1 { color: #38bdf8; }
+    body {
+      font-family: system-ui, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: #e2e8f0;
+    }
+    h1 { color: #34d399; font-size: 1.8rem; }
   </style>
 </head>
 <body>
-  <h1>Hello from HTML Preview!</h1>
+  <h1>Hello from HTML ✨</h1>
 </body>
 </html>
 `,
   },
   'Python Data': {
     language: 'python',
-    code: `# Simple data analysis example (pure Python)
+    code: `# Simple data analysis
 data = [23, 45, 12, 67, 34, 89, 21, 56]
 
 print("Data:", data)
 print("Count:", len(data))
 print("Sum:", sum(data))
-print("Average:", sum(data) / len(data))
-print("Min:", min(data), "Max:", max(data))
-
-# Sort and show
-sorted_data = sorted(data)
-print("Sorted:", sorted_data)
+print("Average:", round(sum(data) / len(data), 2))
+print("Min:", min(data), "| Max:", max(data))
+print("Sorted:", sorted(data))
 `,
   },
 }
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
 type Lang = 'python' | 'javascript' | 'typescript' | 'html'
 
 interface PyodideInterface {
   runPythonAsync: (code: string) => Promise<unknown>
   setStdout: (opts: { batched: (text: string) => void }) => void
   setStderr: (opts: { batched: (text: string) => void }) => void
-  loadPackage: (names: string | string[]) => Promise<void>
 }
 
 declare global {
@@ -106,9 +104,6 @@ declare global {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
 export default function App() {
   const [code, setCode] = useState(SAMPLES.Python.code)
   const [language, setLanguage] = useState<Lang>('python')
@@ -119,6 +114,7 @@ export default function App() {
   const [showPreview, setShowPreview] = useState(false)
   const [previewHtml, setPreviewHtml] = useState('')
   const [pyodideReady, setPyodideReady] = useState(false)
+  const [activeTab, setActiveTab] = useState<'editor' | 'terminal' | 'preview'>('editor')
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const termRef = useRef<Terminal | null>(null)
@@ -126,36 +122,52 @@ export default function App() {
   const fitAddonRef = useRef<FitAddon | null>(null)
   const pyodideRef = useRef<PyodideInterface | null>(null)
 
-  /* -------------------- Terminal setup -------------------- */
+  // Detect mobile
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  /* Terminal */
   useEffect(() => {
     if (!termContainerRef.current || termRef.current) return
 
     const term = new Terminal({
       cursorBlink: true,
-      fontSize: 13,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontSize: isMobile ? 12 : 13,
+      fontFamily: 'Menlo, Monaco, "SF Mono", "Courier New", monospace',
       theme: {
-        background: '#0f172a',
+        background: '#0a0f1a',
         foreground: '#e2e8f0',
-        cursor: '#38bdf8',
-        selectionBackground: '#334155',
+        cursor: '#34d399',
+        selectionBackground: '#1e293b',
+        black: '#0f172a',
+        green: '#34d399',
+        yellow: '#fbbf24',
+        blue: '#38bdf8',
+        magenta: '#a78bfa',
+        cyan: '#22d3ee',
+        red: '#f87171',
       },
       convertEol: true,
+      allowTransparency: true,
     })
 
     const fitAddon = new FitAddon()
-    const webLinks = new WebLinksAddon()
     term.loadAddon(fitAddon)
-    term.loadAddon(webLinks)
+    term.loadAddon(new WebLinksAddon())
     term.open(termContainerRef.current)
     fitAddon.fit()
 
-    term.writeln('\x1b[1;34m╔══════════════════════════════════════╗\x1b[0m')
-    term.writeln('\x1b[1;34m║   Code Sandbox – Terminal Ready      ║\x1b[0m')
-    term.writeln('\x1b[1;34m╚══════════════════════════════════════╝\x1b[0m')
+    term.writeln('\x1b[1;32m  ╭─────────────────────────────╮\x1b[0m')
+    term.writeln('\x1b[1;32m  │   Code Sandbox  v2.0        │\x1b[0m')
+    term.writeln('\x1b[1;32m  ╰─────────────────────────────╯\x1b[0m')
     term.writeln('')
-    term.writeln('Supported: \x1b[32mPython\x1b[0m (Pyodide), \x1b[33mJavaScript\x1b[0m, \x1b[36mTypeScript\x1b[0m, \x1b[35mHTML\x1b[0m')
-    term.writeln('Click \x1b[1mRun\x1b[0m or press \x1b[1mCtrl+Enter\x1b[0m to execute.')
+    term.writeln('  \x1b[90mPython · JS · TS · HTML\x1b[0m')
+    term.writeln('  \x1b[90mTap Run or press Ctrl+Enter\x1b[0m')
     term.writeln('')
 
     termRef.current = term
@@ -168,16 +180,15 @@ export default function App() {
       term.dispose()
       termRef.current = null
     }
-  }, [])
+  }, [isMobile])
 
-  /* Refit terminal when panel visibility changes */
   useEffect(() => {
-    if (showTerminal && fitAddonRef.current) {
-      setTimeout(() => fitAddonRef.current?.fit(), 50)
+    if ((showTerminal || activeTab === 'terminal') && fitAddonRef.current) {
+      setTimeout(() => fitAddonRef.current?.fit(), 80)
     }
-  }, [showTerminal, showPreview])
+  }, [showTerminal, showPreview, activeTab])
 
-  /* -------------------- Load Pyodide -------------------- */
+  /* Pyodide */
   useEffect(() => {
     let cancelled = false
     const load = async () => {
@@ -186,207 +197,284 @@ export default function App() {
         setPyodideReady(true)
         return
       }
-      setStatus('Loading Python runtime (Pyodide)…')
+      setStatus('Loading Python…')
       try {
-        // Load Pyodide script dynamically
         if (!document.getElementById('pyodide-script')) {
           await new Promise<void>((resolve, reject) => {
-            const script = document.createElement('script')
-            script.id = 'pyodide-script'
-            script.src = 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js'
-            script.onload = () => resolve()
-            script.onerror = () => reject(new Error('Failed to load Pyodide'))
-            document.head.appendChild(script)
+            const s = document.createElement('script')
+            s.id = 'pyodide-script'
+            s.src = 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js'
+            s.onload = () => resolve()
+            s.onerror = () => reject(new Error('Pyodide load failed'))
+            document.head.appendChild(s)
           })
         }
-        const pyodide = await window.loadPyodide({
+        const py = await window.loadPyodide({
           indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/',
         })
         if (cancelled) return
-        window.pyodide = pyodide
-        pyodideRef.current = pyodide
+        window.pyodide = py
+        pyodideRef.current = py
         setPyodideReady(true)
-        setStatus('Python ready')
-        termRef.current?.writeln('\x1b[32m✓ Python (Pyodide) loaded successfully\x1b[0m')
-      } catch (err) {
-        console.error(err)
-        setStatus('Failed to load Python runtime')
-        termRef.current?.writeln('\x1b[31m✗ Failed to load Pyodide\x1b[0m')
+        setStatus('Ready')
+        termRef.current?.writeln('\x1b[32m  ✓ Python ready\x1b[0m')
+      } catch {
+        setStatus('Python failed')
+        termRef.current?.writeln('\x1b[31m  ✗ Python failed to load\x1b[0m')
       }
     }
     load()
     return () => { cancelled = true }
   }, [])
 
-  /* -------------------- Helpers -------------------- */
-  const writeToTerm = useCallback((text: string, color?: string) => {
-    const t = termRef.current
-    if (!t) return
-    if (color) t.write(`\x1b[${color}m${text}\x1b[0m`)
-    else t.write(text)
-  }, [])
+  const clearTerm = useCallback(() => termRef.current?.clear(), [])
 
-  const clearTerm = useCallback(() => {
-    termRef.current?.clear()
-  }, [])
-
-  /* -------------------- Run code -------------------- */
   const runCode = useCallback(async () => {
     if (isRunning) return
     setIsRunning(true)
     setStatus('Running…')
+    if (isMobile) setActiveTab('terminal')
+
     const term = termRef.current
 
     try {
       if (language === 'python') {
         if (!pyodideRef.current) {
-          term?.writeln('\x1b[31mPython runtime not ready yet. Wait a moment…\x1b[0m')
-          setStatus('Python not ready')
+          term?.writeln('\x1b[31mPython not ready yet…\x1b[0m')
+          setStatus('Wait for Python')
           return
         }
-        term?.writeln('\x1b[1;34m── Running Python ──\x1b[0m')
+        term?.writeln('\x1b[1;36m── Python ──\x1b[0m')
         const py = pyodideRef.current
-
-        // Capture stdout / stderr
-        let output = ''
-        py.setStdout({
-          batched: (text: string) => {
-            output += text + '\n'
-            term?.writeln(text)
-          },
-        })
-        py.setStderr({
-          batched: (text: string) => {
-            term?.writeln(`\x1b[31m${text}\x1b[0m`)
-          },
-        })
-
+        py.setStdout({ batched: (t) => term?.writeln(t) })
+        py.setStderr({ batched: (t) => term?.writeln(`\x1b[31m${t}\x1b[0m`) })
         try {
           await py.runPythonAsync(code)
-          term?.writeln('\x1b[32m── Finished ──\x1b[0m')
-          setStatus('Finished')
+          term?.writeln('\x1b[32m── done ──\x1b[0m')
+          setStatus('Done')
         } catch (err: any) {
-          const msg = err?.message || String(err)
-          term?.writeln(`\x1b[31m${msg}\x1b[0m`)
+          term?.writeln(`\x1b[31m${err?.message || err}\x1b[0m`)
           setStatus('Error')
         }
       } else if (language === 'javascript' || language === 'typescript') {
-        term?.writeln(`\x1b[1;33m── Running ${language === 'typescript' ? 'TypeScript (as JS)' : 'JavaScript'} ──\x1b[0m`)
-
-        // Capture console
-        const logs: string[] = []
-        const originalLog = console.log
-        const originalError = console.error
-        const originalWarn = console.warn
-
-        console.log = (...args) => {
-          const line = args.map(a => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ')
-          logs.push(line)
-          term?.writeln(line)
-          originalLog.apply(console, args)
+        term?.writeln(`\x1b[1;33m── ${language === 'typescript' ? 'TypeScript' : 'JavaScript'} ──\x1b[0m`)
+        const orig = { log: console.log, error: console.error, warn: console.warn }
+        console.log = (...a) => {
+          term?.writeln(a.map(x => typeof x === 'object' ? JSON.stringify(x, null, 2) : String(x)).join(' '))
+          orig.log(...a)
         }
-        console.error = (...args) => {
-          const line = args.map(String).join(' ')
-          term?.writeln(`\x1b[31m${line}\x1b[0m`)
-          originalError.apply(console, args)
-        }
-        console.warn = (...args) => {
-          const line = args.map(String).join(' ')
-          term?.writeln(`\x1b[33m${line}\x1b[0m`)
-          originalWarn.apply(console, args)
-        }
-
+        console.error = (...a) => { term?.writeln(`\x1b[31m${a.join(' ')}\x1b[0m`); orig.error(...a) }
+        console.warn = (...a) => { term?.writeln(`\x1b[33m${a.join(' ')}\x1b[0m`); orig.warn(...a) }
         try {
-          // Simple eval for demo (TypeScript treated as JS for now)
           // eslint-disable-next-line no-new-func
-          const fn = new Function(code)
-          fn()
-          term?.writeln('\x1b[32m── Finished ──\x1b[0m')
-          setStatus('Finished')
+          new Function(code)()
+          term?.writeln('\x1b[32m── done ──\x1b[0m')
+          setStatus('Done')
         } catch (err: any) {
           term?.writeln(`\x1b[31m${err.message || err}\x1b[0m`)
           setStatus('Error')
         } finally {
-          console.log = originalLog
-          console.error = originalError
-          console.warn = originalWarn
+          Object.assign(console, orig)
         }
       } else if (language === 'html') {
-        term?.writeln('\x1b[1;35m── Rendering HTML Preview ──\x1b[0m')
+        term?.writeln('\x1b[1;35m── HTML Preview ──\x1b[0m')
         setPreviewHtml(code)
         setShowPreview(true)
-        term?.writeln('\x1b[32mPreview updated on the right / below\x1b[0m')
+        if (isMobile) setActiveTab('preview')
+        term?.writeln('\x1b[32mPreview updated\x1b[0m')
         setStatus('Preview ready')
       }
     } finally {
       setIsRunning(false)
     }
-  }, [code, language, isRunning])
+  }, [code, language, isRunning, isMobile])
 
-  /* Keyboard shortcut Ctrl/Cmd + Enter */
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    const h = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault()
         runCode()
       }
     }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
   }, [runCode])
 
-  const onMount: OnMount = (ed) => {
-    editorRef.current = ed
-  }
+  const onMount: OnMount = (ed) => { editorRef.current = ed }
 
   const changeSample = (name: string) => {
-    const sample = SAMPLES[name]
-    if (sample) {
-      setCode(sample.code)
-      setLanguage(sample.language as Lang)
+    const s = SAMPLES[name]
+    if (s) {
+      setCode(s.code)
+      setLanguage(s.language as Lang)
     }
   }
 
-  const getFontSize = () => {
-    if (typeof window === 'undefined') return 14
-    const w = window.innerWidth
-    if (w < 640) return 12
-    if (w < 1024) return 13
-    return 14
-  }
+  const fontSize = isMobile ? 13 : 14
 
-  /* -------------------- Render -------------------- */
-  return (
-    <div className="h-[100dvh] flex flex-col bg-gray-950 text-gray-100 safe-top safe-bottom">
-      {/* HEADER */}
-      <header className="shrink-0 border-b border-gray-800 bg-gray-900">
-        <div className="flex items-center justify-between px-3 sm:px-4 py-2">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-cyan-400 flex items-center justify-center font-bold text-white text-xs sm:text-sm shrink-0">
-              CS
+  /* ========== MOBILE LAYOUT ========== */
+  if (isMobile) {
+    return (
+      <div className="h-[100dvh] flex flex-col bg-[#070b14] text-slate-100 safe-top safe-bottom">
+        {/* Compact header */}
+        <header className="shrink-0 px-3 pt-2 pb-1.5 flex items-center justify-between border-b border-slate-800/80 bg-[#0c1220]/>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <span className="text-white font-bold text-sm">CS</span>
             </div>
-            <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-semibold leading-tight truncate">Code Sandbox</h1>
-              <p className="text-[10px] sm:text-xs text-gray-400 hidden sm:block">
-                Terminal • Python • JS • Preview
+            <div>
+              <h1 className="text-[15px] font-semibold tracking-tight">Code Sandbox</h1>
+              <p className="text-[10px] text-slate-500 leading-none">
+                {language === 'python' ? (pyodideReady ? 'Python ready' : 'Loading Python…') : language}
               </p>
             </div>
           </div>
+          <button
+            onClick={() => setTheme(t => t === 'vs-dark' ? 'light' : 'vs-dark')}
+            className="w-9 h-9 rounded-xl bg-slate-800/80 flex items-center justify-center text-base active:scale-95"
+          >
+            {theme === 'vs-dark' ? '☀️' : '🌙'}
+          </button>
+        </header>
 
-          {/* Desktop controls */}
-          <div className="hidden md:flex items-center gap-2">
-            <select
-              className="bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm"
-              value={Object.entries(SAMPLES).find(([, v]) => v.code === code)?.[0] || 'Python'}
-              onChange={(e) => changeSample(e.target.value)}
+        {/* Language & sample row */}
+        <div className="shrink-0 px-3 py-2 flex gap-2 overflow-x-auto overflow-touch border-b border-slate-800/60">
+          <select
+            className="bg-slate-800/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs appearance-none min-w-[110px]"
+            onChange={(e) => changeSample(e.target.value)}
+            defaultValue="Python"
+          >
+            {Object.keys(SAMPLES).map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+          <select
+            className="bg-slate-800/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs appearance-none"
+            value={language}
+            onChange={(e) => setLanguage(e.target.value as Lang)}
+          >
+            <option value="python">Python</option>
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+            <option value="html">HTML</option>
+          </select>
+        </div>
+
+        {/* Tab switcher */}
+        <div className="shrink-0 flex border-b border-slate-800/60 bg-[#0a101c]">
+          {(['editor', 'terminal', 'preview'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 py-2.5 text-xs font-medium capitalize transition-colors ${
+                activeTab === tab
+                  ? 'text-emerald-400 border-b-2 border-emerald-400 bg-emerald-500/5'
+                  : 'text-slate-500'
+              }`}
             >
-              {Object.keys(SAMPLES).map((name) => (
-                <option key={name} value={name}>{name}</option>
-              ))}
+              {tab === 'editor' ? '📝 Code' : tab === 'terminal' ? '💻 Terminal' : '👁 Preview'}
+            </button>
+          ))}
+        </div>
+
+        {/* Content panels */}
+        <div className="flex-1 min-h-0 relative">
+          {/* Editor */}
+          <div className={`absolute inset-0 ${activeTab === 'editor' ? 'z-10' : 'z-0 invisible'}`}>
+            <Editor
+              height="100%"
+              language={language === 'python' ? 'python' : language}
+              theme={theme}
+              value={code}
+              onChange={(v) => setCode(v || '')}
+              onMount={onMount}
+              options={{
+                fontSize,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                tabSize: 2,
+                wordWrap: 'on',
+                lineNumbers: 'on',
+                lineNumbersMinChars: 3,
+                folding: false,
+                padding: { top: 12, bottom: 12 },
+                renderLineHighlight: 'line',
+              }}
+            />
+          </div>
+
+          {/* Terminal */}
+          <div className={`absolute inset-0 flex flex-col bg-[#0a0f1a] ${activeTab === 'terminal' ? 'z-10' : 'z-0 invisible'}`}>
+            <div ref={termContainerRef} className="flex-1 min-h-0 p-1" />
+          </div>
+
+          {/* Preview */}
+          <div className={`absolute inset-0 flex flex-col bg-white ${activeTab === 'preview' ? 'z-10' : 'z-0 invisible'}`}>
+            <iframe
+              title="Preview"
+              srcDoc={previewHtml || '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:system-ui;color:#94a3b8;background:#f8fafc"><p>Run HTML to see preview</p></body></html>'}
+              className="flex-1 w-full border-0"
+              sandbox="allow-scripts"
+            />
+          </div>
+        </div>
+
+        {/* Bottom action bar – always visible on iPhone */}
+        <div className="shrink-0 px-3 py-2.5 flex items-center gap-2 border-t border-slate-800/80 bg-[#0c1220] safe-bottom">
+          <button
+            onClick={clearTerm}
+            className="w-11 h-11 rounded-2xl bg-slate-800/90 flex items-center justify-center text-slate-400 active:bg-slate-700"
+            title="Clear terminal"
+          >
+            ⌫
+          </button>
+          <div className="flex-1 text-center">
+            <p className="text-[11px] text-slate-500 truncate">{status}</p>
+          </div>
+          <button
+            onClick={runCode}
+            disabled={isRunning || (language === 'python' && !pyodideReady)}
+            className="h-11 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm shadow-lg shadow-emerald-500/25 disabled:opacity-40 active:scale-95 flex items-center gap-2"
+          >
+            {isRunning ? (
+              <span className="animate-pulse">Running…</span>
+            ) : (
+              <>
+                <span>▶</span> Run
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  /* ========== DESKTOP / TABLET LAYOUT ========== */
+  return (
+    <div className="h-[100dvh] flex flex-col bg-[#070b14] text-slate-100">
+      {/* Header */}
+      <header className="shrink-0 border-b border-slate-800/80 bg-[#0c1220]/>
+        <div className="flex items-center justify-between px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <span className="text-white font-bold text-sm">CS</span>
+            </div>
+            <div>
+              <h1 className="text-base font-semibold tracking-tight">Code Sandbox</h1>
+              <p className="text-[11px] text-slate-500">Terminal · Python · JS · Preview</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <select
+              className="bg-slate-800/90 border border-slate-700/70 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+              onChange={(e) => changeSample(e.target.value)}
+              defaultValue="Python"
+            >
+              {Object.keys(SAMPLES).map(n => <option key={n} value={n}>{n}</option>)}
             </select>
 
             <select
-              className="bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm"
+              className="bg-slate-800/90 border border-slate-700/70 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
               value={language}
               onChange={(e) => setLanguage(e.target.value as Lang)}
             >
@@ -396,30 +484,40 @@ export default function App() {
               <option value="html">HTML</option>
             </select>
 
+            <div className="w-px h-6 bg-slate-700/60 mx-1" />
+
             <button
               onClick={() => setTheme(t => t === 'vs-dark' ? 'light' : 'vs-dark')}
-              className="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-sm border border-gray-700"
+              className="w-9 h-9 rounded-xl bg-slate-800/90 border border-slate-700/70 flex items-center justify-center hover:bg-slate-700/80"
             >
               {theme === 'vs-dark' ? '☀️' : '🌙'}
             </button>
 
             <button
               onClick={() => setShowTerminal(s => !s)}
-              className="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-sm border border-gray-700"
+              className={`px-3 py-2 rounded-xl text-sm border ${
+                showTerminal
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                  : 'bg-slate-800/90 border-slate-700/70 text-slate-300 hover:bg-slate-700/80'
+              }`}
             >
-              {showTerminal ? 'Hide Term' : 'Terminal'}
+              Terminal
             </button>
 
             <button
               onClick={() => setShowPreview(s => !s)}
-              className="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-sm border border-gray-700"
+              className={`px-3 py-2 rounded-xl text-sm border ${
+                showPreview
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                  : 'bg-slate-800/90 border-slate-700/70 text-slate-300 hover:bg-slate-700/80'
+              }`}
             >
-              {showPreview ? 'Hide Preview' : 'Preview'}
+              Preview
             </button>
 
             <button
               onClick={clearTerm}
-              className="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-sm border border-gray-700"
+              className="px-3 py-2 rounded-xl text-sm bg-slate-800/90 border border-slate-700/70 text-slate-300 hover:bg-slate-700/80"
             >
               Clear
             </button>
@@ -427,62 +525,21 @@ export default function App() {
             <button
               onClick={runCode}
               disabled={isRunning || (language === 'python' && !pyodideReady)}
-              className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-sm font-medium"
+              className="ml-1 px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white text-sm font-semibold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 disabled:opacity-40 active:scale-[0.98]"
             >
               {isRunning ? 'Running…' : '▶ Run'}
             </button>
           </div>
         </div>
-
-        {/* Mobile controls */}
-        <div className="md:hidden flex items-center gap-1.5 px-3 pb-2 overflow-x-auto">
-          <select
-            className="bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs shrink-0"
-            onChange={(e) => changeSample(e.target.value)}
-            defaultValue="Python"
-          >
-            {Object.keys(SAMPLES).map((name) => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </select>
-
-          <select
-            className="bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs shrink-0"
-            value={language}
-            onChange={(e) => setLanguage(e.target.value as Lang)}
-          >
-            <option value="python">Python</option>
-            <option value="javascript">JS</option>
-            <option value="typescript">TS</option>
-            <option value="html">HTML</option>
-          </select>
-
-          <button onClick={() => setShowTerminal(s => !s)} className="px-2.5 py-1.5 rounded bg-gray-800 text-xs border border-gray-700 shrink-0">
-            Term
-          </button>
-          <button onClick={() => setShowPreview(s => !s)} className="px-2.5 py-1.5 rounded bg-gray-800 text-xs border border-gray-700 shrink-0">
-            Preview
-          </button>
-          <button onClick={clearTerm} className="px-2.5 py-1.5 rounded bg-gray-800 text-xs border border-gray-700 shrink-0">
-            Clear
-          </button>
-          <button
-            onClick={runCode}
-            disabled={isRunning || (language === 'python' && !pyodideReady)}
-            className="px-3 py-1.5 rounded bg-emerald-600 disabled:opacity-50 text-xs font-medium shrink-0"
-          >
-            {isRunning ? '…' : '▶ Run'}
-          </button>
-        </div>
       </header>
 
-      {/* MAIN AREA */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+      {/* Main */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Editor */}
-        <div className={`flex flex-col min-h-0 border-gray-800 ${
+        <div className={`flex flex-col min-h-0 border-slate-800/80 ${
           showTerminal || showPreview
-            ? 'h-1/2 lg:h-full lg:w-1/2 border-b lg:border-b-0 lg:border-r'
-            : 'h-full w-full'
+            ? 'w-1/2 border-r'
+            : 'w-full'
         }`}>
           <div className="flex-1 min-h-0">
             <Editor
@@ -493,61 +550,55 @@ export default function App() {
               onChange={(v) => setCode(v || '')}
               onMount={onMount}
               options={{
-                fontSize: getFontSize(),
+                fontSize,
                 minimap: { enabled: false },
                 scrollBeyondLastLine: false,
                 automaticLayout: true,
                 tabSize: 2,
                 wordWrap: 'on',
-                lineNumbers: typeof window !== 'undefined' && window.innerWidth < 640 ? 'off' : 'on',
-                padding: { top: 8, bottom: 8 },
+                padding: { top: 12, bottom: 12 },
+                renderLineHighlight: 'all',
               }}
             />
           </div>
-          <div className="h-7 sm:h-8 px-2 sm:px-3 flex items-center justify-between text-[10px] sm:text-xs bg-gray-900 border-t border-gray-800 text-gray-400 shrink-0">
-            <span className="truncate">{status}</span>
-            <span className="shrink-0 ml-2">
-              {language === 'python' ? (pyodideReady ? 'Python ✓' : 'Loading Python…') : language}
+          <div className="h-8 px-4 flex items-center justify-between text-xs bg-[#0c1220] border-t border-slate-800/80 text-slate-500">
+            <span>{status}</span>
+            <span className="flex items-center gap-1.5">
+              {language === 'python' && (
+                <span className={`w-1.5 h-1.5 rounded-full ${pyodideReady ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+              )}
+              {language === 'python' ? (pyodideReady ? 'Python' : 'Loading…') : language}
             </span>
           </div>
         </div>
 
-        {/* Right / Bottom panels */}
+        {/* Side panels */}
         {(showTerminal || showPreview) && (
-          <div className={`flex flex-col min-h-0 ${
-            showTerminal && showPreview ? 'h-1/2 lg:h-full lg:w-1/2' : 'h-1/2 lg:h-full lg:w-1/2'
-          }`}>
-            {/* Terminal */}
+          <div className="w-1/2 flex flex-col min-h-0">
             {showTerminal && (
-              <div className={`flex flex-col min-h-0 bg-[#0f172a] ${
-                showPreview ? 'h-1/2 border-b border-gray-800' : 'h-full'
+              <div className={`flex flex-col min-h-0 bg-[#0a0f1a] ${
+                showPreview ? 'h-1/2 border-b border-slate-800/80' : 'h-full'
               }`}>
-                <div className="px-2 sm:px-3 py-1 text-[10px] sm:text-xs border-b border-gray-800 flex justify-between items-center shrink-0 bg-gray-900">
-                  <span>Terminal</span>
-                  <span className="text-gray-500">Ctrl+Enter to Run</span>
+                <div className="px-3 py-1.5 text-xs border-b border-slate-800/80 flex justify-between items-center bg-[#0c1220] text-slate-400">
+                  <span className="font-medium text-slate-300">Terminal</span>
+                  <span className="text-[10px]">Ctrl + Enter</span>
                 </div>
                 <div ref={termContainerRef} className="flex-1 min-h-0 p-1" />
               </div>
             )}
 
-            {/* Preview */}
             {showPreview && (
               <div className={`flex flex-col min-h-0 bg-white ${
                 showTerminal ? 'h-1/2' : 'h-full'
               }`}>
-                <div className="px-2 sm:px-3 py-1 text-[10px] sm:text-xs border-b border-gray-300 flex justify-between items-center shrink-0 bg-gray-100 text-gray-800">
-                  <span>Preview</span>
-                  <button
-                    onClick={() => setShowPreview(false)}
-                    className="text-gray-500 hover:text-gray-800"
-                  >
-                    ✕
-                  </button>
+                <div className="px-3 py-1.5 text-xs border-b border-slate-200 flex justify-between items-center bg-slate-50 text-slate-600">
+                  <span className="font-medium">Preview</span>
+                  <button onClick={() => setShowPreview(false)} className="text-slate-400 hover:text-slate-700 text-sm">✕</button>
                 </div>
                 <iframe
                   title="Preview"
-                  srcDoc={previewHtml || '<html><body style="font-family:system-ui;padding:1rem;color:#64748b">Run HTML code to see preview here</body></html>'}
-                  className="flex-1 w-full border-0 bg-white"
+                  srcDoc={previewHtml || '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:system-ui;color:#94a3b8;background:#f8fafc"><p>Run HTML code to see preview</p></body></html>'}
+                  className="flex-1 w-full border-0"
                   sandbox="allow-scripts"
                 />
               </div>
