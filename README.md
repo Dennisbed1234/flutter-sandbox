@@ -1,23 +1,35 @@
-# Flutter Sandbox
+# Code Sandbox
 
-A completely functional online Flutter playground / sandbox.
-
-Edit Flutter/Dart code in the browser, get real-time analysis, format code, and run/preview your Flutter apps instantly using the official DartPad backend services.
+A real online code sandbox with **terminal**, **editor**, and **preview** — inspired by GitHub Codespaces, but running fully in the browser and deployable on Vercel.
 
 ## Features
 
-- Monaco Editor (VS Code engine) with Dart syntax highlighting
-- Real-time code analysis & error highlighting via DartPad API
-- Code formatting
-- One-click Run that opens a live Flutter preview powered by DartPad
-- Sample Flutter templates (Counter, Material 3, etc.)
+- **Monaco Editor** (same engine as VS Code) with syntax highlighting
+- **Real terminal** powered by xterm.js
+- **Python** execution via Pyodide (WebAssembly) – runs entirely in the browser
+- **JavaScript / TypeScript** execution
+- **HTML** live preview
+- Multiple sample projects
 - Dark / Light theme
-- Fully client-side + public DartPad APIs (no backend required)
-- Ready for Vercel deployment
+- Fully responsive (iPhone, iPad, laptop)
+- Keyboard shortcut: `Ctrl+Enter` / `Cmd+Enter` to Run
+- No backend required – works on Vercel static hosting
+
+## Supported Languages
+
+| Language     | How it runs                          |
+|--------------|--------------------------------------|
+| Python       | Pyodide (in-browser Python)          |
+| JavaScript   | Native browser `eval` / Function     |
+| TypeScript   | Treated as JS for quick demos        |
+| HTML         | Live iframe preview                  |
+
+> Note: This is a **browser-based sandbox**. It cannot install system packages, run Docker, or give a full Linux shell like real GitHub Codespaces. For true containerized environments you would need a backend (e.g. Gitpod, Codespaces, or a self-hosted code-server).
 
 ## Live Demo
 
-After deploying to Vercel: `https://flutter-sandbox.vercel.app` (or your custom domain)
+After deploying to Vercel you get a URL like:
+`https://flutter-sandbox.vercel.app` (or your custom domain)
 
 ## Local Development
 
@@ -31,7 +43,7 @@ npm run dev
 1. Go to [vercel.com/new](https://vercel.com/new)
 2. Import the repository `Dennisbed1234/flutter-sandbox`
 3. Framework Preset: **Vite**
-4. Click Deploy
+4. Click **Deploy**
 
 No environment variables needed.
 
@@ -39,13 +51,9 @@ No environment variables needed.
 
 - Vite + React + TypeScript
 - Monaco Editor
-- DartPad public APIs (`https://stable.api.dartpad.dev`)
+- xterm.js (terminal)
+- Pyodide (Python in WebAssembly)
 - Tailwind CSS
-
-## How it works
-
-- Analysis & Format: POST to DartPad `/api/v3/analyze` and `/api/v3/format`
-- Run: Opens the current code in an embedded or new DartPad Flutter session for full execution + hot reload support
 
 ## License
 
