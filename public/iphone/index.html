@@ -5,163 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#000000" />
-  <title>iPhone 17 — iOS 26 Simulator</title>
-  <link rel="stylesheet" href="css/iphone17.css" />
-  <link rel="stylesheet" href="css/overrides.css" />
-  <link rel="stylesheet" href="css/page-fix.css" />
-  <link rel="stylesheet" href="css/phone-center.css" />
-  <link rel="stylesheet" href="css/perf.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preconnect" href="https://raw.githubusercontent.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap" rel="stylesheet" />
+  <title>iPhone 17 Simulator</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      height: 100dvh; overflow: hidden; background: #000;
+    }
+    #frame {
+      position: fixed; inset: 0; width: 100%; height: 100%;
+      border: 0; display: block; background: #000;
+    }
+  </style>
 </head>
 <body>
-  <div class="device-wrapper">
-    <div class="iphone" id="iphone">
-      <div class="btn volume-up"></div>
-      <div class="btn volume-down"></div>
-      <div class="btn action"></div>
-      <div class="btn power"></div>
-      <div class="screen" id="screen">
-        <div class="dynamic-island" id="dynamicIsland">
-          <div class="island-content">
-            <div class="island-camera"></div>
-            <div class="island-sensors"></div>
-          </div>
-          <div class="island-expanded" id="islandExpanded"></div>
-        </div>
-        <div class="status-bar" id="statusBar">
-          <div class="status-left"><span class="time" id="statusTime">9:41</span></div>
-          <div class="status-right">
-            <span class="signal"><svg width="17" height="12" viewBox="0 0 17 12"><rect x="0" y="8" width="3" height="4" rx="0.5" fill="currentColor"/><rect x="4.5" y="5" width="3" height="7" rx="0.5" fill="currentColor"/><rect x="9" y="2" width="3" height="10" rx="0.5" fill="currentColor"/><rect x="13.5" y="0" width="3" height="12" rx="0.5" fill="currentColor" opacity="0.35"/></svg></span>
-            <span class="cellular-5g">5G</span>
-            <span class="battery"><span class="battery-level" id="batteryLevel"></span></span>
-          </div>
-        </div>
-        <div class="boot-screen" id="bootScreen">
-          <div class="apple-logo">
-            <svg viewBox="0 0 64 64" width="72" height="72">
-              <path fill="#fff" d="M48.334 33.875c-.093-7.593 6.169-11.249 6.45-11.436a13.669 13.669 0 0 0-10.936-5.906c-4.674-.469-9.067 2.718-11.5 2.718-2.337 0-5.982-2.718-9.908-2.625a14.765 14.765 0 0 0-12.339 7.5C4.868 33.313 8.794 47 13.935 54.4c2.524 3.656 5.515 7.78 9.441 7.593 3.832-.187 5.235-2.437 9.815-2.437S39.08 62 43.1 61.9c4.113-.094 6.637-3.75 9.16-7.405a29.782 29.782 0 0 0 4.113-8.53 13.082 13.082 0 0 1-8.039-12.09z"/>
-              <path fill="#fff" d="M40.762 11.565A13.423 13.423 0 0 0 43.847 2a13.194 13.194 0 0 0-8.787 4.5c-1.963 2.25-3.645 5.812-3.178 9.28 3.365.284 6.824-1.68 8.88-4.215z"/>
-            </svg>
-          </div>
-        </div>
-        <div class="lock-screen" id="lockScreen">
-          <div class="lock-wallpaper"></div>
-          <div class="lock-content">
-            <div class="lock-date-top" id="lockDate">Tuesday, April 1</div>
-            <div class="lock-time" id="lockTime">9:41</div>
-            <div class="lock-notif">
-              <div class="ln-avatar">A</div>
-              <div class="ln-body">
-                <div class="ln-name">Allegra Topper</div>
-                <div class="ln-text">Are you hearing these wild noises coming from the roof of Apple Park, or is it just me?</div>
-              </div>
-            </div>
-          </div>
-          <div class="lock-bottom">
-            <button class="lock-btn flashlight" id="flashlightBtn" title="Flashlight">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M9 2h6v4l2 4v10a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V10l2-4V2zm2 14h2v2h-2v-2z"/></svg>
-            </button>
-            <button class="lock-btn camera-btn" id="lockCameraBtn" title="Camera">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            </button>
-          </div>
-        </div>
-        <div class="passcode-screen" id="passcodeScreen">
-          <div class="passcode-header">
-            <p class="passcode-title">Enter Passcode</p>
-            <div class="passcode-dots" id="passcodeDots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-          </div>
-          <div class="keypad" id="keypad">
-            <button data-key="1">1</button><button data-key="2">2<span>ABC</span></button><button data-key="3">3<span>DEF</span></button>
-            <button data-key="4">4<span>GHI</span></button><button data-key="5">5<span>JKL</span></button><button data-key="6">6<span>MNO</span></button>
-            <button data-key="7">7<span>PQRS</span></button><button data-key="8">8<span>TUV</span></button><button data-key="9">9<span>WXYZ</span></button>
-            <button class="empty"></button><button data-key="0">0</button><button data-key="del" class="del">⌫</button>
-          </div>
-          <button class="emergency-btn">Emergency</button>
-        </div>
-        <div class="home-screen" id="homeScreen">
-          <div class="home-wallpaper"></div>
-          <div class="pages" id="homePages">
-            <div class="page widgets-page" data-page="0">
-              <div class="today-stack">
-                <div class="tw-battery">
-                  <div class="tw-ring-row">
-                    <div class="tw-ring"><span>📱</span></div>
-                    <div class="tw-ring empty"></div>
-                    <div class="tw-ring empty"></div>
-                    <div class="tw-ring empty"></div>
-                  </div>
-                  <div class="tw-batt-pct">100%</div>
-                </div>
-                <div class="tw-row">
-                  <div class="tw-cal" data-app="calendar">
-                    <div class="tw-cal-day" id="twDay">WEDNESDAY</div>
-                    <div class="tw-cal-date" id="twDate">16</div>
-                    <div class="tw-cal-ev">No Events Today</div>
-                  </div>
-                  <div class="tw-weather" data-app="weather">
-                    <div class="tw-w-loc">Lagos</div>
-                    <div class="tw-w-temp">77°</div>
-                    <div class="tw-w-note">☂️ 90% chance of rain on Friday</div>
-                  </div>
-                </div>
-                <div class="tw-maps" data-app="maps">
-                  <div class="tw-map-img"></div>
-                  <div class="tw-map-btns"><span>🔍</span><span>🍴</span></div>
-                </div>
-                <div class="tw-row">
-                  <div class="tw-tips"><div class="tw-tips-title">How to screen unknown senders</div></div>
-                  <div class="tw-batt2"><div class="tw-ring small"><span>📱</span></div><div class="tw-batt-pct">100%</div></div>
-                </div>
-              </div>
-            </div>
-            <div class="page active" data-page="1">
-              <div class="widgets-row">
-                <div class="widget weather-widget" data-app="weather">
-                  <div class="w-loc">London</div>
-                  <div class="w-temp" id="wTemp">11°</div>
-                  <div class="w-cond">Mostly Cloudy</div>
-                  <div class="w-hl">H:17° L:10°</div>
-                </div>
-                <div class="widget calendar-widget" data-app="calendar">
-                  <div class="w-day" id="wDay">FRIDAY</div>
-                  <div class="w-date" id="wDate">26</div>
-                  <div class="w-events">No events today</div>
-                </div>
-              </div>
-              <div class="widget-labels"><span>Weather</span><span>Calendar</span></div>
-              <div class="app-grid" id="appGrid1"></div>
-            </div>
-            <div class="page" data-page="2"><div class="app-grid" id="appGrid2"></div></div>
-            <div class="page" data-page="3"><div class="app-grid" id="appGrid3"></div></div>
-          </div>
-          <div class="page-dots" id="pageDots"><span></span><span class="active"></span><span></span><span></span></div>
-          <div class="dock" id="dock"></div>
-        </div>
-        <div class="app-container" id="appContainer"></div>
-        <div class="home-indicator" id="homeIndicator"></div>
-      </div>
-    </div>
-  </div>
-  <div class="desktop-hint">
-    <p>iPhone 17 · iOS 26</p>
-    <p class="hint-sub">Swipe up = Face ID · Swipe right = Widgets · Swipe left = more apps · Passcode 000000</p>
-  </div>
-  <script src="js/apps-data.js"></script>
-  <script src="js/iphone17-apps.js"></script>
-  <script src="js/iphone17-apps-extra.js"></script>
-  <script src="js/settings-ios.js"></script>
-  <script src="js/media-social.js"></script>
-  <script src="js/light-apps-fix.js"></script>
-  <script src="js/phone-fix.js"></script>
-  <script src="js/call-ui-fix.js"></script>
-  <script src="js/call-bridge.js"></script>
-  <script src="js/camera-photos-fix.js"></script>
-  <script src="js/iphone17.js"></script>
-  <script src="js/faceid-fix.js"></script>
-  <script src="js/perf-fix.js"></script>
+  <!-- Always load the fully-deployed simulator so CSS/JS never go missing -->
+  <iframe
+    id="frame"
+    title="iPhone 17"
+    src="https://i-phone17-mock.vercel.app/?embed=1"
+    allow="camera; microphone; fullscreen; autoplay"
+    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+  ></iframe>
 </body>
 </html>
