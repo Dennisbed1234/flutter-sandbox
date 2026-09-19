@@ -33,12 +33,15 @@ export default function App() {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 768 : true
   )
+  const [showPasteBox, setShowPasteBox] = useState(false)
+  const [pasteText, setPasteText] = useState('')
 
   const termRef = useRef<Terminal | null>(null)
   const termContainerRef = useRef<HTMLDivElement>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const pyodideRef = useRef<PyodideInterface | null>(null)
-  const termInited = useRef(false)
+  const editorRef = useRef<any>(null)
+  const pasteAreaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -47,12 +50,19 @@ export default function App() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  // Init terminal when container is visible
+  // Init terminal when container exists
   useEffect(() => {
     const el = termContainerRef.current
     if (!el) return
+
     if (termRef.current) {
-      fitAddonRef.current?.fit()
+      // Already created – reattach if needed and fit
+      try {
+        if (!(termRef.current as any).element?.isConnected) {
+          termRef.current.open(el)
+        }
+        fitAddonRef.current?.fit()
+      } catch { /* ignore */ }
       return
     }
 
@@ -67,6 +77,7 @@ export default function App() {
         selectionBackground: '#1e293b',
       },
       convertEol: true,
+      scrollback: 5000,
     })
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
@@ -78,13 +89,12 @@ export default function App() {
     term.writeln('')
     termRef.current = term
     fitAddonRef.current = fitAddon
-    termInited.current = true
 
-    const onResize = () => fitAddon.fit()
-    window.addEventListener('resize', onResize)
-    return () => {
-      window.removeEventListener('resize', onResize)
+    const onResize = () => {
+      try { fitAddon.fit() } catch { /* ignore */ }
     }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [activeTab, isMobile])
 
   useEffect(() => {
@@ -123,16 +133,94 @@ export default function App() {
     return () => { cancelled = true }
   }, [])
 
+  // Fully clear terminal (viewport + scrollback)
   const clearTerminal = useCallback(() => {
-    termRef.current?.clear()
-    termRef.current?.writeln('Terminal cleared')
+    const term = termRef.current
+    if (!term) {
+      setStatus('Open Terminal tab first')
+      setActiveTab('terminal')
+      return
+    }
+    // Hard reset: clear screen + scrollback + home cursor
+    term.reset()
+    term.clear()
+    term.write('\x1b[2J\x1b[3J\x1b[H')
+    term.writeln('Terminal cleared')
+    term.writeln('')
+    setActiveTab('terminal')
     setStatus('Terminal cleared')
+    try { fitAddonRef.current?.fit() } catch { /* ignore */ }
   }, [])
 
   const clearCode = useCallback(() => {
     setCode('')
-    setStatus('Code cleared')
+    if (editorRef.current) {
+      editorRef.current.setValue('')
+    }
+    setStatus('Code erased')
+    setActiveTab('editor')
   }, [])
+
+  // Paste into editor – works on iPhone
+  const pasteCode = useCallback(async () => {
+    setActiveTab('editor')
+    try {
+      // Prefer modern clipboard API (works on iOS 13.4+ with user gesture)
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText()
+        if (text && text.length > 0) {
+          const ed = editorRef.current
+          if (ed) {
+            const selection = ed.getSelection()
+            const id = { major: 1, minor: 1 }
+            const op = {
+              identifier: id,
+              range: selection,
+              text,
+              forceMoveMarkers: true,
+            }
+            ed.executeEdits('paste', [op])
+            setCode(ed.getValue())
+          } else {
+            setCode((prev) => (prev ? prev + '\n' + text : text))
+          }
+          setStatus('Pasted from clipboard')
+          return
+        }
+      }
+    } catch {
+      // Fall through to manual paste box (iOS often blocks silent read)
+    }
+    // Fallback: show paste textarea (always works on iPhone)
+    setPasteText('')
+    setShowPasteBox(true)
+    setTimeout(() => pasteAreaRef.current?.focus(), 100)
+  }, [])
+
+  const applyPasteBox = useCallback(() => {
+    const text = pasteText
+    if (!text) {
+      setShowPasteBox(false)
+      return
+    }
+    const ed = editorRef.current
+    if (ed) {
+      const selection = ed.getSelection()
+      ed.executeEdits('paste', [{
+        identifier: { major: 1, minor: 1 },
+        range: selection,
+        text,
+        forceMoveMarkers: true,
+      }])
+      setCode(ed.getValue())
+    } else {
+      setCode((prev) => (prev ? prev + '\n' + text : text))
+    }
+    setShowPasteBox(false)
+    setPasteText('')
+    setStatus('Pasted')
+    setActiveTab('editor')
+  }, [pasteText])
 
   const runCode = useCallback(async () => {
     if (isRunning) return
@@ -208,33 +296,76 @@ export default function App() {
       setCode(s.code)
       setLanguage(s.language as Lang)
       setStatus('Sample loaded')
+      setActiveTab('editor')
     }
   }
 
   const fontSize = isMobile ? 13 : 14
+
+  const PasteModal = () => {
+    if (!showPasteBox) return null
+    return (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-3">
+        <div className="w-full max-w-lg bg-[#0c1220] border border-slate-700 rounded-2xl p-4 shadow-2xl">
+          <h3 className="text-sm font-semibold text-slate-100 mb-2">Paste your code</h3>
+          <p className="text-[11px] text-slate-500 mb-3">
+            Long-press below → Paste, then tap Apply
+          </p>
+          <textarea
+            ref={pasteAreaRef}
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            placeholder="Paste code here…"
+            className="w-full h-40 bg-[#0a0f1a] border border-slate-700 rounded-xl p-3 text-sm text-slate-100 font-mono resize-none focus:outline-none focus:border-emerald-500"
+            autoFocus
+          />
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => { setShowPasteBox(false); setPasteText('') }}
+              className="flex-1 h-11 rounded-xl bg-slate-800 text-slate-300 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={applyPasteBox}
+              className="flex-1 h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm"
+            >
+              Apply Paste
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   // Shared bottom bar for mobile
   const MobileBar = () => (
     <div className="shrink-0 px-2 py-2 flex items-center gap-1.5 border-t border-slate-800 bg-[#0c1220] safe-bottom">
       <button
         onClick={clearCode}
-        className="h-10 px-3 rounded-xl bg-slate-800 text-xs text-slate-300 active:bg-slate-700"
+        className="h-10 px-2.5 rounded-xl bg-slate-800 text-[11px] text-slate-300 active:bg-slate-700"
       >
         Erase
       </button>
       <button
-        onClick={clearTerminal}
-        className="h-10 px-3 rounded-xl bg-slate-800 text-xs text-slate-300 active:bg-slate-700"
+        onClick={pasteCode}
+        className="h-10 px-2.5 rounded-xl bg-slate-800 text-[11px] text-slate-300 active:bg-slate-700"
       >
-        Clear Term
+        Paste
       </button>
-      <div className="flex-1 text-center">
+      <button
+        onClick={clearTerminal}
+        className="h-10 px-2.5 rounded-xl bg-slate-800 text-[11px] text-slate-300 active:bg-slate-700"
+      >
+        Clear
+      </button>
+      <div className="flex-1 text-center min-w-0">
         <p className="text-[10px] text-slate-500 truncate">{status}</p>
       </div>
       <button
         onClick={runCode}
         disabled={isRunning}
-        className="h-10 px-5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm disabled:opacity-40 shadow-lg shadow-emerald-500/20"
+        className="h-10 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm disabled:opacity-40 shadow-lg shadow-emerald-500/20"
       >
         {isRunning ? '…' : 'Run'}
       </button>
@@ -244,6 +375,7 @@ export default function App() {
   if (isMobile) {
     return (
       <div className="h-[100dvh] flex flex-col bg-[#070b14] text-slate-100 safe-top">
+        <PasteModal />
         <header className="shrink-0 px-3 pt-2 pb-1.5 flex items-center justify-between border-b border-slate-800 bg-[#0c1220]">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center">
@@ -292,7 +424,14 @@ export default function App() {
           {(['editor', 'terminal', 'preview'] as const).map(tab => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setActiveTab(tab)
+                if (tab === 'terminal') {
+                  setTimeout(() => {
+                    try { fitAddonRef.current?.fit() } catch { /* ignore */ }
+                  }, 50)
+                }
+              }}
               className={`flex-1 py-2.5 text-xs font-medium ${
                 activeTab === tab
                   ? 'text-emerald-400 border-b-2 border-emerald-400'
@@ -312,6 +451,7 @@ export default function App() {
               theme={theme}
               value={code}
               onChange={(v) => setCode(v || '')}
+              onMount={(editor) => { editorRef.current = editor }}
               options={{
                 fontSize,
                 minimap: { enabled: false },
@@ -328,6 +468,10 @@ export default function App() {
           </div>
 
           <div className={`absolute inset-0 flex flex-col bg-[#0a0f1a] ${activeTab === 'terminal' ? 'z-10' : 'invisible'}`}>
+            <div className="px-3 py-1.5 text-xs border-b border-slate-800 flex justify-between bg-[#0c1220] text-slate-400">
+              <span className="text-slate-300 font-medium">Terminal</span>
+              <button onClick={clearTerminal} className="text-emerald-400 font-medium">Clear</button>
+            </div>
             <div ref={termContainerRef} className="flex-1 min-h-0 p-1" />
           </div>
 
@@ -349,6 +493,7 @@ export default function App() {
   // Desktop
   return (
     <div className="h-[100dvh] flex flex-col bg-[#070b14] text-slate-100">
+      <PasteModal />
       <header className="shrink-0 border-b border-slate-800 bg-[#0c1220]">
         <div className="flex items-center justify-between px-4 py-2.5">
           <div className="flex items-center gap-3">
@@ -361,7 +506,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             <select
               className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm"
               onChange={(e) => changeSample(e.target.value)}
@@ -381,6 +526,12 @@ export default function App() {
               <option value="python">Python</option>
               <option value="typescript">TypeScript</option>
             </select>
+            <button
+              onClick={pasteCode}
+              className="px-3 py-2 rounded-xl text-sm bg-slate-800 border border-slate-700 text-slate-300"
+            >
+              Paste
+            </button>
             <button
               onClick={clearCode}
               className="px-3 py-2 rounded-xl text-sm bg-slate-800 border border-slate-700 text-slate-300"
@@ -419,6 +570,7 @@ export default function App() {
               theme={theme}
               value={code}
               onChange={(v) => setCode(v || '')}
+              onMount={(editor) => { editorRef.current = editor }}
               options={{
                 fontSize,
                 minimap: { enabled: false },
@@ -440,7 +592,7 @@ export default function App() {
           <div className="h-1/2 flex flex-col min-h-0 border-b border-slate-800 bg-[#0a0f1a]">
             <div className="px-3 py-1.5 text-xs border-b border-slate-800 flex justify-between bg-[#0c1220] text-slate-400">
               <span className="text-slate-300 font-medium">Terminal</span>
-              <button onClick={clearTerminal} className="text-emerald-400 hover:underline">Clear</button>
+              <button onClick={clearTerminal} className="text-emerald-400 hover:underline font-medium">Clear</button>
             </div>
             <div ref={termContainerRef} className="flex-1 min-h-0 p-1" />
           </div>
