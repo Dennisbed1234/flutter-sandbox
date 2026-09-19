@@ -21,11 +21,8 @@ declare global {
   }
 }
 
-const IPHONE_URLS = [
-  '/iphone/index.html',
-  'https://i-phone17-mock.vercel.app',
-  'https://iphone17-mock.vercel.app',
-]
+/** Always use the fully deployed simulator so CSS/JS never go missing */
+const IPHONE_LIVE = 'https://i-phone17-mock.vercel.app/'
 
 const PLACEHOLDER_HTML =
   '<html><body style="display:flex;align-items:center;justify-content:center;height:100%;margin:0;font-family:-apple-system,system-ui;color:#94a3b8;background:#000;text-align:center;padding:24px"><div><p style="font-size:15px">Tap <b style="color:#34d399">Run</b> to preview HTML</p><p style="font-size:12px;opacity:0.7;margin-top:10px">or open full iPhone simulator</p></div></body></html>'
@@ -76,7 +73,6 @@ export default function App() {
   const [showPasteBox, setShowPasteBox] = useState(false)
   const [pasteText, setPasteText] = useState('')
   const [showIPhone, setShowIPhone] = useState(false)
-  const [iphoneSrc, setIphoneSrc] = useState(IPHONE_URLS[0])
 
   const termRef = useRef<Terminal | null>(null)
   const termContainerRef = useRef<HTMLDivElement>(null)
@@ -90,21 +86,6 @@ export default function App() {
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const r = await fetch('/iphone/index.html', { method: 'HEAD' })
-        if (!cancelled && r.ok) {
-          setIphoneSrc('/iphone/index.html')
-          return
-        }
-      } catch { /* ignore */ }
-      if (!cancelled) setIphoneSrc(IPHONE_URLS[1])
-    })()
-    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -375,12 +356,34 @@ export default function App() {
   if (showIPhone) {
     return (
       <div className="fixed inset-0 z-[100] bg-black flex flex-col">
-        <div className="shrink-0 flex items-center justify-between px-3 py-2 bg-black/90 border-b border-white/10">
-          <button onClick={() => setShowIPhone(false)} className="h-9 px-4 rounded-full bg-white/10 text-white text-sm font-medium">← Back</button>
-          <span className="text-xs text-white/60">iPhone 17 · Passcode 000000</span>
-          <button onClick={() => { const el = document.getElementById('iphone-frame') as HTMLIFrameElement | null; if (el) el.src = el.src }} className="h-9 px-3 rounded-full bg-white/10 text-white text-xs">Reboot</button>
+        <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 bg-black/95 border-b border-white/10 safe-top">
+          <button
+            onClick={() => setShowIPhone(false)}
+            className="h-9 px-4 rounded-full bg-white/15 text-white text-sm font-medium shrink-0"
+          >
+            ← Back
+          </button>
+          <span className="text-[11px] text-white/55 text-center flex-1 truncate">
+            Passcode 000000 · swipe up = unlock
+          </span>
+          <button
+            onClick={() => {
+              const el = document.getElementById('iphone-frame') as HTMLIFrameElement | null
+              if (el) el.src = IPHONE_LIVE + '?t=' + Date.now()
+            }}
+            className="h-9 px-3 rounded-full bg-white/15 text-white text-xs shrink-0"
+          >
+            Reboot
+          </button>
         </div>
-        <iframe id="iphone-frame" title="iPhone 17 Simulator" src={iphoneSrc} className="flex-1 w-full border-0 bg-black" allow="camera; microphone; fullscreen" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals" />
+        <iframe
+          id="iphone-frame"
+          title="iPhone 17 Simulator"
+          src={IPHONE_LIVE}
+          className="flex-1 w-full border-0 bg-black"
+          allow="camera; microphone; fullscreen; autoplay"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+        />
       </div>
     )
   }
@@ -392,7 +395,14 @@ export default function App() {
         <div className="w-full max-w-lg bg-[#0c1220] border border-slate-700 rounded-2xl p-4 shadow-2xl">
           <h3 className="text-sm font-semibold text-slate-100 mb-2">Paste your code</h3>
           <p className="text-[11px] text-slate-500 mb-3">Long-press below → Paste, then Apply</p>
-          <textarea ref={pasteAreaRef} value={pasteText} onChange={(e) => setPasteText(e.target.value)} placeholder="Paste code here…" className="w-full h-40 bg-[#0a0f1a] border border-slate-700 rounded-xl p-3 text-sm text-slate-100 font-mono resize-none focus:outline-none focus:border-emerald-500" autoFocus />
+          <textarea
+            ref={pasteAreaRef}
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            placeholder="Paste code here…"
+            className="w-full h-40 bg-[#0a0f1a] border border-slate-700 rounded-xl p-3 text-sm text-slate-100 font-mono resize-none focus:outline-none focus:border-emerald-500"
+            autoFocus
+          />
           <div className="flex gap-2 mt-3">
             <button onClick={() => { setShowPasteBox(false); setPasteText('') }} className="flex-1 h-11 rounded-xl bg-slate-800 text-slate-300 text-sm">Cancel</button>
             <button onClick={applyPasteBox} className="flex-1 h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm">Apply Paste</button>
@@ -403,7 +413,11 @@ export default function App() {
   }
 
   const LangSelect = ({ className }: { className?: string }) => (
-    <select className={className || 'bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs'} value={language} onChange={(e) => setLanguage(e.target.value as Lang)}>
+    <select
+      className={className || 'bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs'}
+      value={language}
+      onChange={(e) => setLanguage(e.target.value as Lang)}
+    >
       <option value="html">HTML</option>
       <option value="dart">Dart</option>
       <option value="javascript">JavaScript</option>
@@ -418,34 +432,88 @@ export default function App() {
         <PasteModal />
         <header className="shrink-0 px-3 pt-2 pb-1.5 flex items-center justify-between border-b border-slate-800 bg-[#0c1220]">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center"><span className="text-white font-bold text-sm">CS</span></div>
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center">
+              <span className="text-white font-bold text-sm">CS</span>
+            </div>
             <div>
               <h1 className="text-[15px] font-semibold">Code Sandbox</h1>
-              <p className="text-[10px] text-slate-500">{language === 'python' ? (pyodideReady ? 'Python ready' : 'Loading Python…') : language}</p>
+              <p className="text-[10px] text-slate-500">
+                {language === 'python' ? (pyodideReady ? 'Python ready' : 'Loading Python…') : language}
+              </p>
             </div>
           </div>
           <div className="flex gap-1.5">
-            <button onClick={() => setShowIPhone(true)} className="h-9 px-3 rounded-xl bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/30">📱 iPhone</button>
-            <button onClick={() => setTheme(t => t === 'vs-dark' ? 'light' : 'vs-dark')} className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center">{theme === 'vs-dark' ? '☀️' : '🌙'}</button>
+            <button
+              onClick={() => setShowIPhone(true)}
+              className="h-9 px-3 rounded-xl bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/30"
+            >
+              📱 iPhone
+            </button>
+            <button
+              onClick={() => setTheme(t => t === 'vs-dark' ? 'light' : 'vs-dark')}
+              className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center"
+            >
+              {theme === 'vs-dark' ? '☀️' : '🌙'}
+            </button>
           </div>
         </header>
+
         <div className="shrink-0 px-3 py-2 flex gap-2 overflow-x-auto border-b border-slate-800">
-          <select className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs min-w-[120px]" onChange={(e) => changeSample(e.target.value)} defaultValue="iPhone Home">
-            {Object.keys(SAMPLES).map(n => (<option key={n} value={n}>{n}</option>))}
+          <select
+            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs min-w-[120px]"
+            onChange={(e) => changeSample(e.target.value)}
+            defaultValue="iPhone Home"
+          >
+            {Object.keys(SAMPLES).map(n => (
+              <option key={n} value={n}>{n}</option>
+            ))}
           </select>
           <LangSelect />
         </div>
+
         <div className="shrink-0 flex border-b border-slate-800 bg-[#0a101c]">
           {(['editor', 'terminal', 'preview'] as const).map(tab => (
-            <button key={tab} onClick={() => { setActiveTab(tab); if (tab === 'terminal') setTimeout(() => { try { fitAddonRef.current?.fit() } catch { /* */ } }, 50) }} className={`flex-1 py-2.5 text-xs font-medium ${activeTab === tab ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-slate-500'}`}>
+            <button
+              key={tab}
+              onClick={() => {
+                setActiveTab(tab)
+                if (tab === 'terminal') {
+                  setTimeout(() => { try { fitAddonRef.current?.fit() } catch { /* */ } }, 50)
+                }
+              }}
+              className={`flex-1 py-2.5 text-xs font-medium ${
+                activeTab === tab ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-slate-500'
+              }`}
+            >
               {tab === 'editor' ? 'Code' : tab === 'terminal' ? 'Terminal' : 'Preview'}
             </button>
           ))}
         </div>
+
         <div className="flex-1 min-h-0 relative">
           <div className={`absolute inset-0 ${activeTab === 'editor' ? 'z-10' : 'invisible'}`}>
-            <Editor height="100%" language={monacoLang(language)} theme={theme} value={code} onChange={(v) => setCode(v || '')} onMount={(editor) => { editorRef.current = editor }} options={{ fontSize, minimap: { enabled: false }, scrollBeyondLastLine: false, automaticLayout: true, tabSize: 2, wordWrap: 'on', lineNumbers: 'on', lineNumbersMinChars: 3, folding: false, padding: { top: 8, bottom: 8 } }} />
+            <Editor
+              height="100%"
+              language={monacoLang(language)}
+              theme={theme}
+              value={code}
+              onChange={(v) => setCode(v || '')}
+              onMount={(editor) => { editorRef.current = editor }}
+              options={{
+                fontSize,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                tabSize: 2,
+                wordWrap: 'on',
+                lineNumbers: 'on',
+                lineNumbersMinChars: 3,
+                folding: false,
+                padding: { top: 8, bottom: 8 },
+              }}
+            />
           </div>
+
           <div className={`absolute inset-0 flex flex-col bg-[#0a0f1a] ${activeTab === 'terminal' ? 'z-10' : 'invisible'}`}>
             <div className="px-3 py-1.5 text-xs border-b border-slate-800 flex justify-between bg-[#0c1220] text-slate-400">
               <span className="text-slate-300 font-medium">Terminal</span>
@@ -453,17 +521,32 @@ export default function App() {
             </div>
             <div ref={termContainerRef} className="flex-1 min-h-0 p-1" />
           </div>
+
           <div className={`absolute inset-0 ${activeTab === 'preview' ? 'z-10' : 'invisible'}`}>
             <IPhoneFrame html={previewHtml} />
           </div>
         </div>
+
         <div className="shrink-0 px-2 py-2 flex items-center gap-1.5 border-t border-slate-800 bg-[#0c1220] safe-bottom">
           <button onClick={clearCode} className="h-10 px-2 rounded-xl bg-slate-800 text-[11px] text-slate-300">Erase</button>
           <button onClick={pasteCode} className="h-10 px-2 rounded-xl bg-slate-800 text-[11px] text-slate-300">Paste</button>
           <button onClick={clearTerminal} className="h-10 px-2 rounded-xl bg-slate-800 text-[11px] text-slate-300">Clear</button>
-          <button onClick={() => setShowIPhone(true)} className="h-10 px-2.5 rounded-xl bg-slate-700 text-[11px] text-emerald-300 font-medium">iPhone</button>
-          <div className="flex-1 text-center min-w-0"><p className="text-[10px] text-slate-500 truncate">{status}</p></div>
-          <button onClick={runCode} disabled={isRunning} className="h-10 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm disabled:opacity-40">{isRunning ? '…' : 'Run'}</button>
+          <button
+            onClick={() => setShowIPhone(true)}
+            className="h-10 px-2.5 rounded-xl bg-slate-700 text-[11px] text-emerald-300 font-medium"
+          >
+            iPhone
+          </button>
+          <div className="flex-1 text-center min-w-0">
+            <p className="text-[10px] text-slate-500 truncate">{status}</p>
+          </div>
+          <button
+            onClick={runCode}
+            disabled={isRunning}
+            className="h-10 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-sm disabled:opacity-40"
+          >
+            {isRunning ? '…' : 'Run'}
+          </button>
         </div>
       </div>
     )
@@ -475,35 +558,78 @@ export default function App() {
       <header className="shrink-0 border-b border-slate-800 bg-[#0c1220]">
         <div className="flex items-center justify-between px-4 py-2.5">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center"><span className="text-white font-bold text-sm">CS</span></div>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center">
+              <span className="text-white font-bold text-sm">CS</span>
+            </div>
             <div>
               <h1 className="text-base font-semibold">Code Sandbox</h1>
               <p className="text-[11px] text-slate-500">Dart · Python · JS · HTML · iPhone 17 preview</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            <button onClick={() => setShowIPhone(true)} className="px-4 py-2 rounded-xl text-sm bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/40">📱 Full iPhone</button>
-            <select className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm" onChange={(e) => changeSample(e.target.value)} defaultValue="iPhone Home">
-              {Object.keys(SAMPLES).map(n => (<option key={n} value={n}>{n}</option>))}
+            <button
+              onClick={() => setShowIPhone(true)}
+              className="px-4 py-2 rounded-xl text-sm bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/40"
+            >
+              📱 Full iPhone
+            </button>
+            <select
+              className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm"
+              onChange={(e) => changeSample(e.target.value)}
+              defaultValue="iPhone Home"
+            >
+              {Object.keys(SAMPLES).map(n => (
+                <option key={n} value={n}>{n}</option>
+              ))}
             </select>
             <LangSelect className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm" />
             <button onClick={pasteCode} className="px-3 py-2 rounded-xl text-sm bg-slate-800 border border-slate-700 text-slate-300">Paste</button>
             <button onClick={clearCode} className="px-3 py-2 rounded-xl text-sm bg-slate-800 border border-slate-700 text-slate-300">Erase</button>
             <button onClick={clearTerminal} className="px-3 py-2 rounded-xl text-sm bg-slate-800 border border-slate-700 text-slate-300">Clear</button>
-            <button onClick={() => setTheme(t => t === 'vs-dark' ? 'light' : 'vs-dark')} className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center">{theme === 'vs-dark' ? '☀️' : '🌙'}</button>
-            <button onClick={runCode} disabled={isRunning} className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white text-sm font-semibold disabled:opacity-40">{isRunning ? 'Running…' : 'Run'}</button>
+            <button
+              onClick={() => setTheme(t => t === 'vs-dark' ? 'light' : 'vs-dark')}
+              className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center"
+            >
+              {theme === 'vs-dark' ? '☀️' : '🌙'}
+            </button>
+            <button
+              onClick={runCode}
+              disabled={isRunning}
+              className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white text-sm font-semibold disabled:opacity-40"
+            >
+              {isRunning ? 'Running…' : 'Run'}
+            </button>
           </div>
         </div>
       </header>
+
       <div className="flex-1 flex overflow-hidden min-h-0">
         <div className="w-1/2 flex flex-col border-r border-slate-800 min-h-0">
           <div className="flex-1 min-h-0">
-            <Editor height="100%" language={monacoLang(language)} theme={theme} value={code} onChange={(v) => setCode(v || '')} onMount={(editor) => { editorRef.current = editor }} options={{ fontSize, minimap: { enabled: false }, scrollBeyondLastLine: false, automaticLayout: true, tabSize: 2, wordWrap: 'on', padding: { top: 12, bottom: 12 } }} />
+            <Editor
+              height="100%"
+              language={monacoLang(language)}
+              theme={theme}
+              value={code}
+              onChange={(v) => setCode(v || '')}
+              onMount={(editor) => { editorRef.current = editor }}
+              options={{
+                fontSize,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                tabSize: 2,
+                wordWrap: 'on',
+                padding: { top: 12, bottom: 12 },
+              }}
+            />
           </div>
           <div className="h-8 px-4 flex items-center justify-between text-xs bg-[#0c1220] border-t border-slate-800 text-slate-500">
-            <span>{status}</span><span>{language}</span>
+            <span>{status}</span>
+            <span>{language}</span>
           </div>
         </div>
+
         <div className="w-1/2 flex flex-col min-h-0">
           <div className="h-[42%] flex flex-col min-h-0 border-b border-slate-800 bg-[#0a0f1a]">
             <div className="px-3 py-1.5 text-xs border-b border-slate-800 flex justify-between bg-[#0c1220] text-slate-400">
